@@ -1,0 +1,16 @@
+node_modules/
+.wrangler/
+.env
+.env.*
+!.env.example
+.dev.vars
+coverage/
+dist/
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
+*.db
+backups/
+artifacts/
+*.log
+!pubspec.lock

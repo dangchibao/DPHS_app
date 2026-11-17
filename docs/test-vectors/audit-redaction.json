@@ -1,0 +1,6 @@
+[
+ {"name":"Tiền thu được giữ, bí mật lồng nhau bị che","action":"PAYMENT_RECEIVE","changes":{"amount":1000000,"metadata":{"token":"fixture-secret","items":[{"password_hash":"fixture-hash","code":"HD-CN01-A2"}]}},"expected":{"amount":1000000,"metadata":{"token":"[Đã ẩn]","items":[{"password_hash":"[Đã ẩn]","code":"HD-CN01-A2"}]}}},
+ {"name":"Số lương và cấu hình không vào log quản lý","action":"PAYROLL_RULE_SAVE","changes":{"employee_id":"u1","rule_id":"r1","count":1,"amount":10000000,"config":{"standard_days":26,"base_salary":10000000}},"expected":{"employee_id":"u1","rule_id":"r1","count":1,"amount":"[Đã ẩn]","config":"[Đã ẩn]"}},
+ {"name":"Che lương cả khi dùng action chung","action":"EMPLOYEE_SAVE","changes":{"before":{"salary":9000000,"role":"cashier"},"after":{"Salary":10000000,"bonus":500000,"role":"manager"}},"expected":{"before":{"salary":"[Đã ẩn]","role":"cashier"},"after":{"Salary":"[Đã ẩn]","bonus":"[Đã ẩn]","role":"manager"}}},
+ {"name":"Dữ liệu đã che giữ nguyên để xác minh hash","action":"SALARY_ISSUE","changes":{"period_start":"2026-11-01","period_end":"2026-12-01","total":"[Đã ẩn]"},"expected":{"period_start":"2026-11-01","period_end":"2026-12-01","total":"[Đã ẩn]"}}
+]

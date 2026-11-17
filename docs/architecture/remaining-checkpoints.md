@@ -1,0 +1,16 @@
+# Mốc còn lại sau giá / may / đổi trả
+
+Người dùng đã cho phép tự động tiếp tục, không hỏi duyệt giữa phase. Không push/deploy/đổi production/dùng phí. Chỉ cần chủ làm việc ngoài môi trường khi đã có kết quả cụ thể để xem.
+
+1. Đã có giữ hàng DH schema 17, tiếp tục nghiệm thu thiết bị thật: đọc reservations-design.md; tách đơn tạm đang có khỏi giữ tồn có hạn, cập nhật tồn khả dụng ở POS/combo/đổi hàng/negative stock. Causal dependencies và mốc thời gian resolution phải đúng.
+2. Đã có onboarding cửa hàng/thiết bị động, duyệt/thu hồi tại schema 18; còn hoàn thiện quản trị store/điều chuyển nhân viên; quyền bán/thu/nhận hàng theo máy có đối soát. Không để bản cài thật dùng chung store-cn01/device-a2 demo.
+3. Chuyển kho CK theo multi-store-next.md, projection store-scoped, máy nhận chỉ định, chênh lệch và audit.
+4. Nhân viên/chấm công/lương: compensation_versions riêng, bảng lương theo kỳ bất biến và phiếu lương. Chỉ owner/accountant đọc dữ liệu lương; backend cũng kiểm tra. Feed riêng private payroll, không đưa vào store feed cho thu ngân/kho. Audit phải che password/credential/token/secret/salary trước hash, server không nhận positive audit chứa giá trị nhạy cảm chưa che. Không tuyên bố chống người có toàn quyền OS.
+5. Dashboard/báo cáo: revenue từ dòng HD/MR và hàng thay thế DT, trừ return_lines.credit; không cộng total DT hay CK vào doanh thu. COGS từ snapshot line, hàng nhận lại hoàn cost gốc. Thu/hoàn tiền riêng theo payments.direction, công nợ từ receivable_ledger. Daily store/product/employee summaries cập nhật tăng dần, có filter ngày/năm học/trường và tổng hệ thống. Cache báo cáo lỗi/vượt phạm vi phải báo rõ và có thể dựng lại, không chặn POS vì cache báo cáo. Không tổng hợp nặng ở Worker; client Excel/PDF.
+6. Web/PWA online quản lý/báo cáo thật: hiện còn placeholder. Không giả POS offline trên web. Dùng API quyền tương ứng, read-only online có phân trang/bảng tổng hợp; HTTPS trên release, không Firebase.
+7. Hoàn thiện size chart cấu hình/gợi ý, ảnh chọn/cache offline và tùy chọn R2, QR ngân hàng bằng ảnh chủ cung cấp. Không tự tạo QR thanh toán hoặc xác minh ngân hàng ngoài scope.
+8. Backup: kiểm tra marker trước nâng cấp có được đăng ký backup_runs/audit, chế độ mã hóa nhất quán cho mọi loại backup, diễn tập/rotation và cloud tùy chọn có mã hóa. Chưa làm khôi phục sang máy mới và retention cloud. Không auto cấp lại quyền cho bản sao DB.
+9. Lịch sử school/student/class revision cho snapshot đã bán offline: hiện API kiểm tra quan hệ lớp/trường hiện tại, có thể giữ để xử lý khi học sinh chuyển trường trước sync. Cân nhắc history versions + proof student/class/school được duyệt để xác minh quá khứ mà không làm mất giao dịch. Không thêm module ngoài danh sách.
+10. Tích hợp: test migration/clock/rollback/retry/permissions, E2E nhiều store/device, Windows/APK/Web, PDF render, hướng dẫn/bộ cài, secret/env. Kiểm tra máy thật/scanner/dữ liệu cloud/CPU cần chủ cấp tài khoản hoặc thiết bị ở bước cuối; chưa deploy khi chưa được phép.
+
+Cloud Free đã kiểm chứng developers.cloudflare.com ngày 15/11/2026. Queries/Worker 50, bind/query 100, SQL function args 32; batch tính một query. Mô phỏng 900 HD/ngày 4 dòng chỉ còn khoảng 7,7% ngân sách ghi, chưa tính đầy đủ báo cáo/DT/giữ/chuyển kho. Không cam kết 0đ vô hạn; quá quota vẫn bán local/outbox, retry có kiểm soát.

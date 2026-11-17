@@ -1,0 +1,17 @@
+[
+  {"name":"Phần trăm lẻ làm tròn xuống VND", "config":{"discount_type":"percent","value":1250}, "amount":12345,"expected":1543},
+  {"name":"Giảm cố định không vượt tổng", "config":{"value":20000},"amount":10000,"expected":10000},
+  {"name":"100 phần trăm với số nguyên lớn", "config":{"discount_type":"percent","value":10000},"amount":9007199254740991,"expected":9007199254740991},
+  {"name":"Không cộng thủ công", "config":{},"amount":100000,"manual":1,"reject":true},
+  {"name":"Không tự cộng bảng giá", "config":{},"amount":100000,"priceList":true,"reject":true},
+  {"name":"Cho cộng bảng giá rõ ràng", "config":{"allow_price_list":true},"amount":100000,"priceList":true,"expected":1000},
+  {"name":"Combo mặc định không cộng", "config":{},"amount":100000,"combos":true,"reject":true},
+  {"name":"Ngưỡng mua nhiều", "config":{"min_quantity":3},"amount":100000,"quantity":2,"reject":true},
+  {"name":"Ngưỡng tiền hàng", "config":{"min_total":100001},"amount":100000,"reject":true},
+  {"name":"Voucher không phân biệt chữ thường", "config":{"voucher":"DAUNAM"},"amount":100000,"voucher":"  daunam ","expected":1000},
+  {"name":"Voucher sai", "config":{"voucher":"DAUNAM"},"amount":100000,"voucher":"OTHER","reject":true},
+  {"name":"Đúng lúc kết thúc đã hết hạn", "config":{"ends_at":"2026-11-15T00:00:00.000Z"},"amount":100000,"reject":true},
+  {"name":"Chưa tới thời gian bắt đầu", "config":{"starts_at":"2026-11-16T00:00:00.000Z"},"amount":100000,"reject":true},
+  {"name":"Sai trường", "config":{"school_id":"s2"},"school":"s1","amount":100000,"reject":true},
+  {"name":"Sai nhóm khách", "config":{"customer_kind":"dealer"},"customerKind":"parent","amount":100000,"reject":true}
+]

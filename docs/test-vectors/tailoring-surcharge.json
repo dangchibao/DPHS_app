@@ -1,0 +1,12 @@
+[
+  {"name":"Đúng ngưỡng không thêm bậc","chest":1000,"expected":10000},
+  {"name":"Vượt một mm làm tròn một bậc","chest":1001,"expected":25000},
+  {"name":"Đúng cuối bậc","chest":1050,"expected":25000},
+  {"name":"Vượt bậc tiếp theo","chest":1051,"expected":40000},
+  {"name":"Yêu cầu may gấp cộng rõ ràng","chest":1000,"options":["rush"],"expected":30000},
+  {"name":"Không nhân đôi cùng yêu cầu","chest":1000,"options":["rush","rush"],"reject":true},
+  {"name":"Không nhận yêu cầu ngoài cấu hình","chest":1000,"options":["unknown"],"reject":true},
+  {"name":"Thiếu số đo không được né phụ thu","chest":1000,"omit":"waist","reject":true},
+  {"name":"Không dùng số đo bằng không","chest":0,"reject":true},
+  {"name":"Không tràn tiền","chest":1001,"base_fee":9007199254740991,"reject":true}
+]

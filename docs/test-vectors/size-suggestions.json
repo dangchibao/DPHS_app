@@ -1,0 +1,13 @@
+{
+  "rows": [
+    {"size":"S","height_min":1100,"height_max":1300,"weight_min":18000,"weight_max":30000},
+    {"size":"M","height_min":1250,"height_max":1450,"weight_min":26000,"weight_max":40000}
+  ],
+  "cases": [
+    {"name":"Đúng cận dưới","height":1100,"weight":18000,"expected":["S"]},
+    {"name":"Hai size ở vùng giao nhau, giữ thứ tự cấu hình","height":1300,"weight":30000,"expected":["S","M"]},
+    {"name":"Vượt cận trên một milimet","height":1301,"weight":30000,"expected":["M"]},
+    {"name":"Phải khớp cả cao và nặng","height":1400,"weight":50000,"expected":[]},
+    {"name":"Ngoài bảng không tự đoán size","height":2000,"weight":80000,"expected":[]}
+  ]
+}

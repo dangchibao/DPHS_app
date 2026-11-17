@@ -1,0 +1,23 @@
+{
+  "name": "ngoc-thanh-api",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev --local",
+    "typecheck": "tsc --noEmit",
+    "lint": "prettier --check src test load *.ts",
+    "format": "prettier --write src test load *.ts",
+    "test": "vitest run",
+    "simulate": "vitest run --config vitest.load.config.ts",
+    "migrate:local": "wrangler d1 migrations apply DB --local",
+    "build": "wrangler deploy --dry-run --outdir dist"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "latest",
+    "@types/node": "latest",
+    "prettier": "^3.10.1",
+    "typescript": "latest",
+    "vitest": "latest",
+    "wrangler": "latest"
+  }
+}

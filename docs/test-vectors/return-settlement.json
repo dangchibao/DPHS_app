@@ -1,0 +1,11 @@
+[
+ {"name":"Trả hàng đã thanh toán đủ","balance":0,"returned":100000,"replacement":0,"received":0,"offset":0,"due":-100000,"refund":100000,"debt":0},
+ {"name":"Trả hàng chưa trả đồng nào","balance":100000,"returned":100000,"replacement":0,"received":0,"offset":100000,"due":0,"refund":0,"debt":0},
+ {"name":"Trả hàng có đặt cọc","balance":60000,"returned":100000,"replacement":0,"received":0,"offset":60000,"due":-40000,"refund":40000,"debt":0},
+ {"name":"Đổi sang món đắt hơn","balance":0,"returned":100000,"replacement":120000,"received":20000,"offset":0,"due":20000,"refund":0,"debt":0},
+ {"name":"Đổi sang món rẻ hơn","balance":0,"returned":100000,"replacement":80000,"received":0,"offset":0,"due":-20000,"refund":20000,"debt":0},
+ {"name":"Đổi size khi còn nợ giữ tổng công nợ","balance":100000,"returned":100000,"replacement":100000,"received":0,"offset":100000,"due":100000,"refund":0,"debt":100000},
+ {"name":"Đổi có cấn nợ và đặt cọc thêm","balance":50000,"returned":100000,"replacement":120000,"received":20000,"offset":50000,"due":70000,"refund":0,"debt":50000},
+ {"name":"Không vừa hoàn vừa thu","balance":0,"returned":100000,"replacement":0,"received":1,"reject":true},
+ {"name":"Không nhận vượt chênh lệch","balance":0,"returned":100000,"replacement":120000,"received":20001,"reject":true}
+]

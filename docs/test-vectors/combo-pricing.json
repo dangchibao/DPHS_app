@@ -1,0 +1,38 @@
+[
+  {
+    "name":"Giá lẻ nguyên VND",
+    "items":[{"id":"a","product_id":"shirt","price":100001,"quantity":3}],
+    "combos":[],
+    "expected":{"regular_subtotal":300003,"subtotal":300003,"rounding_discount":0,"amount":300003,"lines":{"a":[300003,100001,0]}}
+  },
+  {
+    "name":"Combo áo quần có dư 1 đồng khi phân bổ",
+    "items":[{"id":"a","product_id":"shirt","price":125000,"quantity":1},{"id":"b","product_id":"trousers","price":145000,"quantity":1}],
+    "combos":[{"rule":{"id":"set","version":"v1","name":"Bộ chính khóa","price":250001,"parts":[{"product_id":"shirt","quantity":1},{"product_id":"trousers","quantity":1}]},"picks":["a","b"],"quantity":1}],
+    "expected":{"regular_subtotal":270000,"subtotal":250001,"rounding_discount":0,"amount":250001,"lines":{"a":[115741,115741,0],"b":[134260,134260,0]}}
+  },
+  {
+    "name":"Hai món cùng biến thể cần giảm 1 đồng do đơn giá làm tròn",
+    "items":[{"id":"a","product_id":"shirt","price":100000,"quantity":2}],
+    "combos":[{"rule":{"id":"set","version":"v1","name":"Hai áo","price":100001,"parts":[{"product_id":"shirt","quantity":2}]},"picks":["a"],"quantity":1}],
+    "expected":{"regular_subtotal":200000,"subtotal":100002,"rounding_discount":1,"amount":100001,"lines":{"a":[100001,50001,1]}}
+  },
+  {
+    "name":"Giá combo riêng cao hơn giá lẻ, giỏ có thêm hàng lẻ",
+    "items":[{"id":"a","product_id":"shirt","price":100000,"quantity":3},{"id":"b","product_id":"hat","price":50000,"quantity":1}],
+    "combos":[{"rule":{"id":"set","version":"v1","name":"Bộ riêng","price":180001,"parts":[{"product_id":"shirt","quantity":1},{"product_id":"hat","quantity":1}]},"picks":["a","b"],"quantity":1}],
+    "expected":{"regular_subtotal":350000,"subtotal":380001,"rounding_discount":0,"amount":380001,"lines":{"a":[320001,106667,0],"b":[60000,60000,0]}}
+  },
+  {
+    "name":"Món giá lẻ bằng 0 vẫn phân bổ combo được",
+    "items":[{"id":"a","product_id":"shirt","price":0,"quantity":3},{"id":"b","product_id":"hat","price":0,"quantity":1}],
+    "combos":[{"rule":{"id":"set","version":"v1","name":"Bộ cấu hình mới","price":7,"parts":[{"product_id":"shirt","quantity":3},{"product_id":"hat","quantity":1}]},"picks":["a","b"],"quantity":1}],
+    "expected":{"regular_subtotal":0,"subtotal":9,"rounding_discount":2,"amount":7,"lines":{"a":[4,2,2],"b":[3,3,0]}}
+  },
+  {
+    "name":"Nhiều combo và hàng lẻ dùng cùng một biến thể",
+    "items":[{"id":"a","product_id":"shirt","price":100000,"quantity":4},{"id":"b","product_id":"trousers","price":200000,"quantity":1}],
+    "combos":[{"rule":{"id":"shirt-deal","version":"v1","name":"Áo ưu đãi","price":1000,"parts":[{"product_id":"shirt","quantity":1}]},"picks":["a"],"quantity":2},{"rule":{"id":"set","version":"v1","name":"Bộ áo quần","price":250000,"parts":[{"product_id":"shirt","quantity":1},{"product_id":"trousers","quantity":1}]},"picks":["a","b"],"quantity":1}],
+    "expected":{"regular_subtotal":600000,"subtotal":352003,"rounding_discount":3,"amount":352000,"lines":{"a":[185333,46334,3],"b":[166667,166667,0]}}
+  }
+]
