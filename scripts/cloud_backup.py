@@ -199,6 +199,8 @@ def command(args: list[str], *, env=None, input=None, cwd=None) -> bytes:
         if env.get('GNUPGHOME'):
             env['GNUPGHOME'] = msys_path(env['GNUPGHOME'])
     result = subprocess.run(args, input=input, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                            stdin=subprocess.DEVNULL if input is None else None,
+                            creationflags=subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0,
                             env=env, cwd=cwd, timeout=1200, check=False)
     if result.returncode:
         raise RuntimeError(f'Công cụ {Path(args[0]).name} thất bại (exit {result.returncode}); không công bố nội dung nhạy cảm.')

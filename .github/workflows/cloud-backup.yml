@@ -1,7 +1,5 @@
-name: Sao lưu D1 riêng tư
+name: R2 legacy - không dùng trong cấu hình miễn phí
 on:
-  schedule:
-    - cron: "30 19 * * *" # 02:30 Việt Nam; GitHub có thể chạy trễ.
   workflow_dispatch:
 permissions:
   contents: read
@@ -10,6 +8,8 @@ concurrency:
   cancel-in-progress: false
 jobs:
   backup:
+    # Người dùng yêu cầu không subscription/thanh toán. Dùng backup Windows.
+    if: ${{ false }}
     runs-on: ubuntu-latest
     timeout-minutes: 25
     environment: private-backup

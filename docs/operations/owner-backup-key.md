@@ -39,6 +39,8 @@ Lượt thực ngày 18/11 đạt với SQL xuất từ database E2E có giao d�
 
 ## Điều kiện để chạy hằng đêm
 
+**Phương án hiện hành không cần R2:** [backup tự động về Windows](free-operation.md). Các điều kiện R2/GitHub bên dưới là lịch sử của phương án đã bỏ, không phải việc chủ phải làm. Khóa GPG vẫn được dùng cho bản sao mã hóa trên máy; lịch chỉ chạy khi máy bật, tài khoản Windows đăng nhập và có mạng/phiên Wrangler hợp lệ.
+
 - R2 vẫn trả 10042/chưa kích hoạt. Chủ cần tự xem điều kiện kích hoạt/chi phí của Cloudflare; chưa tự bật subscription hoặc phương thức thanh toán.
 - Cần bucket R2 Standard private và token/S3 credentials quyền tối thiểu, đặt vào secrets theo cloud-backup.md; không gửi qua chat.
 - Repository dangchibao/DPHS_app là public. Ngày 18/11 người dùng đã cho phép riêng và source/workflow được push main tại commit 97666f7. Chưa cấu hình secrets R2 hoặc bật lịch; private key không được xuất bản. Xem ../phases/github-publish-backup.md.

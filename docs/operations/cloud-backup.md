@@ -1,5 +1,7 @@
 # Sao lưu cloud và diễn tập khôi phục
 
+**Quyết định mới 18/11/2026: không dùng R2/subscription.** Phương án hiện hành là [backup mã hóa về Windows, không R2](free-operation.md). Workflow R2 dưới đây chỉ là tài liệu/phần mã tham khảo cũ, đã bỏ cron và khóa job; không làm theo yêu cầu tạo bucket/secrets hoặc bật lịch ở các phần cũ bên dưới.
+
 Pipeline đã chuẩn bị trong `.github/workflows/cloud-backup.yml` và `scripts/cloud_backup.py`. Chưa kích hoạt, chưa chạy trên tài khoản Cloudflare/GitHub thật. Không tự tạo bucket, bật thanh toán, deploy hay thay database production.
 
 ## Luồng và lịch

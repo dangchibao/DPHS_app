@@ -2,7 +2,7 @@
 
 Địa chỉ: https://ngoc-thanh-pos-staging.ngoc-thanh-161df6.workers.dev
 
-Đây là môi trường thử độc lập, dùng D1 APAC schema 30; ENVIRONMENT=production để tắt bootstrap công khai. Không dùng dữ liệu bán hàng thật khi chưa nghiệm thu thiết bị/quy trình và hoàn tất backup cloud. Web/PWA quản lý online, không POS offline.
+Đây là môi trường thử độc lập, dùng D1 APAC schema 30; ENVIRONMENT=production để tắt bootstrap công khai. Không dùng dữ liệu bán hàng thật khi chưa nghiệm thu thiết bị/quy trình và backup độc lập. [Cấu hình miễn phí hiện hành](free-operation.md) không dùng R2/subscription; sao lưu D1 mã hóa về Windows. Web/PWA quản lý online, không POS offline.
 
 ## Đăng nhập chủ lần đầu
 
@@ -47,8 +47,8 @@ Build lại dùng `./scripts/build-signed-android.ps1`; tạo khóa mới lần 
 - 14 kiểm tra HTTP thực đã đạt: HTML, health/schema 30, API private không bị SPA thay thế, bootstrap bị chặn, client cũ bị chặn, challenge/KDF/login owner, quyền Web, management/reports, logout/thu hồi. Owner browser đầu tiên còn chưa claim.
 - Chrome đã tải bản HTTPS thật ở viewport mobile, hiển thị form đăng nhập/API URL và không có lỗi JS; screenshot được kiểm tra trực quan. Đây không thay thế nghiệm thu iPhone/Android thật.
 - SQL xuất từ D1 thật đã qua integrity/FK/ledger trên SQLite và import lại vào D1 drill độc lập: 84 bảng, 77 dòng ở thời điểm snapshot, checksum từng bảng/FK/quick_check đạt. Database drill không gắn Worker, không phải database của app và không được tự thay vào app. Nó chứa snapshot thử, giữ cách ly. Đây không phải lịch sao lưu tự động.
-- R2 đang chưa kích hoạt, API trả code 10042. Không bật thanh toán/subscription. Ảnh cloud, archive audit R2 và backup R2 tự động chưa hoạt động; dữ liệu hot trong D1 và ảnh cục bộ vẫn có cơ chế hiện hành. Chủ cần tự quyết định kích hoạt R2 và phương thức thanh toán nếu muốn dùng; không có cam kết 0đ vô hạn.
-- GitHub source/workflow đã push main ngày 18/11 sau khi người dùng cho phép riêng; lịch backup chưa bật. Cần bucket private, public key GPG do chủ giữ private key và GitHub Environment Secrets/token quyền tối thiểu; không dùng OAuth token Wrangler có thời hạn làm secret backup dài hạn. Xem ../phases/github-publish-backup.md.
+- Không dùng R2 theo yêu cầu miễn phí toàn bộ; không yêu cầu chủ kích hoạt hoặc thêm phương thức thanh toán. Ảnh ở máy, audit giữ trong D1; backup D1 mã hóa về Windows, không phải lưu trữ cloud ảnh/backup vô hạn. Xem free-operation.md.
+- GitHub source/workflow đã push main ngày 18/11 sau khi được phép riêng. Workflow R2 cũ đã bỏ cron và khóa job; không tạo R2 secrets hoặc bật lịch đó. Task Windows thay thế dùng phiên Wrangler của chính người dùng máy, không đưa OAuth/private key lên GitHub.
 - Chưa ký Authenticode cho Windows, chưa nghiệm thu Windows sạch/HID/máy in/Android/iPhone vật lý. Không kích hoạt dịch vụ trả phí hoặc sửa tài nguyên production đã có.
 
 Tham khảo [R2 bắt đầu sử dụng](https://developers.cloudflare.com/r2/get-started/) và [Workers Free pricing](https://developers.cloudflare.com/workers/platform/pricing/). Không thay hoặc xóa private files/khóa ký để chạy lại setup.

@@ -1,4 +1,4 @@
-# Tiến độ kiểm chứng — cập nhật 17/11/2026
+# Tiến độ kiểm chứng — cập nhật 18/11/2026
 
 Người dùng đã cho phép tiếp tục tự động giữa các phase. Đây là mốc tích hợp đang phát triển, chưa phải nghiệm thu toàn bộ yêu cầu và chưa dùng cho dữ liệu thật.
 
@@ -6,7 +6,7 @@ Người dùng đã cho phép tiếp tục tự động giữa các phase. Đây
 
 Các nhóm nghiệp vụ trong yêu cầu đã có trong source và bản chạy thử: POS, kho/biến thể/size/barcode, PDF, combo, trường/lớp/học sinh, khuyến mãi/giá riêng, may riêng, đổi trả, cọc/công nợ, giữ hàng, chuyển kho, nhân viên/quyền/chấm công/lương, dashboard/báo cáo, đồng bộ, audit và sao lưu/khôi phục. Windows có bộ cài EXE và bản portable kèm CRT; Android có cả APK debug preview và APK ký release bằng khóa ngoài repo; Web/PWA staging online đã deploy.
 
-Cloudflare staging đã hoạt động, khóa Android release đã tạo và cần chủ sao lưu độc lập. Những việc còn lại để đưa vào vận hành là kích hoạt R2 có kiểm soát chi phí, thiết lập GitHub backup/secrets, nghiệm thu tải và thiết bị vật lý. Ngày 18/11 người dùng đã cho phép riêng push mã nguồn/workflow; đã xuất bản main tại 97666f7. Không thay production hoặc bật subscription/thanh toán. Chưa có cơ sở cam kết hạn mức miễn phí đủ cho mọi tải hoặc nghiệm thu máy thật. Xem remaining-requested.md, preview-0.7.md và windows-installer.md để biết phạm vi hiện hành.
+Cloudflare staging đã hoạt động, khóa Android release đã tạo và cần chủ sao lưu độc lập. Quyết định mới miễn phí toàn bộ: không dùng R2/subscription. Backup D1 mã hóa về Windows, ảnh cục bộ, audit giữ trong D1; xem ../operations/free-operation.md. Không yêu cầu chủ kích hoạt R2. Còn nghiệm thu bản sao độc lập, tải và thiết bị vật lý. Ngày 18/11 người dùng đã cho phép riêng push mã nguồn/workflow; đã xuất bản main tại 97666f7. Không thay production hoặc bật subscription/thanh toán. Chưa có cơ sở cam kết hạn mức miễn phí đủ cho mọi tải hoặc nghiệm thu máy thật. Xem remaining-requested.md, preview-0.7.md và windows-installer.md để biết phạm vi hiện hành.
 
 ## Cách đọc các mốc bên dưới
 
@@ -100,7 +100,7 @@ Sau mốc schema 19 bổ sung sửa ngày mã chứng từ: counter/code lấy m
 
 ## Mốc source schema 20 — chuyển kho
 
-CK xuất/giao/nhận, máy đích chỉ định, projection theo store, kiểm đếm thiếu/dư/0, snapshot giá vốn và outbox causal. Toàn bộ 134 test Flutter và 108 test API đạt; analyze/lint/typecheck/dry-run và D1 local migration 20 đạt. Smoke HTTP workerd hai chi nhánh đạt luồng chuyển kho/nhận thiếu/replay/scope projection. Xem transfers.md. Source 0.5.0+5, chưa đóng gói lại; preview 0.4.0 vẫn schema 18. Chưa có payroll/dashboard/Web quản lý hoàn chỉnh hoặc backup cloud.
+CK xuất/giao/nhận, máy đích chỉ định, projection theo store, kiểm đếm thiếu/dư/0, snapshot giá vốn và outbox causal. Toàn bộ 137 test Flutter và 108 test API đạt; analyze/lint/typecheck/dry-run và D1 local migration 20 đạt. Smoke HTTP workerd hai chi nhánh đạt luồng chuyển kho/nhận thiếu/replay/scope projection. Xem transfers.md. Source 0.5.0+5, chưa đóng gói lại; preview 0.4.0 vẫn schema 18. Chưa có payroll/dashboard/Web quản lý hoàn chỉnh hoặc backup cloud.
 
 ## Mốc source schema 21 — chấm công và bảo vệ phiên
 
@@ -148,3 +148,5 @@ Hotfix Web 18/11 đã deploy: lưu/tự điền cặp ID sau đăng nhập trự
 Ngày 18/11 rà soát lại readiness: remaining-requested.md là backlog hiện hành, các ghi chú schema cũ là lịch sử. R2 còn activation-required/10042 và workflow backup trên main còn 404. Không đổi code, không có lượt test/build/deploy mới trong lần cập nhật này.
 
 Ngày 18/11 sau quyền push riêng: 97666f7 đã lên main; GitHub CI 44309618580 completed/success (178 API, 26 Python; Flutter analyze/test, crash recovery, Windows/Web release build). Sửa gate đọc Environment sau khi job được gán; thiếu hai cờ không export/upload. R2 vẫn 10042 và tài liệu nhà cung cấp yêu cầu checkout/subscription, nên không kích hoạt trong quyền không bật thanh toán. Xem github-publish-backup.md.
+
+Quyết định sau cùng 18/11: miễn phí toàn bộ, bỏ yêu cầu R2/subscription. free-operation.md ghi 37 test Python đạt và backup D1 mã hóa về Windows, giải mã/restore keyring mới đạt; Task Scheduler thực result 0 tạo ciphertext mới. Lịch 02:30/logon cần máy bật/đăng nhập/mạng. Backup độc lập ngoài máy và phần cứng thực vẫn chưa nghiệm thu. Không deploy hoặc sửa nghiệp vụ.

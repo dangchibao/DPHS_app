@@ -19,7 +19,7 @@
       "/media/*", "/usage", "/audit/*"
     ]
   },
-  // Add IMAGES and/or AUDIT_ARCHIVES R2 bindings only after private bucket/budget review.
+  // Current free-only configuration has no R2 bindings or subscription.
   // Never add secrets to this file. Use wrangler secret put with the chosen config.
   "vars": {
     "ENVIRONMENT": "production",
