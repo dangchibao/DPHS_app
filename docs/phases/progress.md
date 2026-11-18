@@ -6,7 +6,7 @@ Người dùng đã cho phép tiếp tục tự động giữa các phase. Đây
 
 Các nhóm nghiệp vụ trong yêu cầu đã có trong source và bản chạy thử: POS, kho/biến thể/size/barcode, PDF, combo, trường/lớp/học sinh, khuyến mãi/giá riêng, may riêng, đổi trả, cọc/công nợ, giữ hàng, chuyển kho, nhân viên/quyền/chấm công/lương, dashboard/báo cáo, đồng bộ, audit và sao lưu/khôi phục. Windows có bộ cài EXE và bản portable kèm CRT; Android có cả APK debug preview và APK ký release bằng khóa ngoài repo; Web/PWA staging online đã deploy.
 
-Cloudflare staging đã hoạt động, khóa Android release đã tạo và cần chủ sao lưu độc lập. Những việc còn lại để đưa vào vận hành là kích hoạt R2 có kiểm soát chi phí, thiết lập GitHub backup/secrets, nghiệm thu tải và thiết bị vật lý. Không tự push/deploy/thay production/bật phí theo AGENTS.md. Chưa có cơ sở cam kết hạn mức miễn phí đủ cho mọi tải hoặc nghiệm thu máy thật. Xem remaining-requested.md, preview-0.7.md và windows-installer.md để biết phạm vi hiện hành.
+Cloudflare staging đã hoạt động, khóa Android release đã tạo và cần chủ sao lưu độc lập. Những việc còn lại để đưa vào vận hành là kích hoạt R2 có kiểm soát chi phí, thiết lập GitHub backup/secrets, nghiệm thu tải và thiết bị vật lý. Ngày 18/11 người dùng đã cho phép riêng push mã nguồn/workflow; đã xuất bản main tại 97666f7. Không thay production hoặc bật subscription/thanh toán. Chưa có cơ sở cam kết hạn mức miễn phí đủ cho mọi tải hoặc nghiệm thu máy thật. Xem remaining-requested.md, preview-0.7.md và windows-installer.md để biết phạm vi hiện hành.
 
 ## Cách đọc các mốc bên dưới
 
@@ -146,3 +146,5 @@ Ngày 18/11 chốt hồ sơ Native→Cloudflare E2E: 2 hóa đơn/2 mã, 3 payme
 Hotfix Web 18/11 đã deploy: lưu/tự điền cặp ID sau đăng nhập trực tiếp, tương thích khóa cũ, không lưu token/mật khẩu/quyền; bỏ phản hồi login muộn khi đóng màn hình. 209 test Flutter/analyze đạt, Web build và Chrome/HTTPS đạt. Xem web-login-identity.md. Không migration/schema/native/API; R2/GitHub backup vẫn cần các điều kiện ngoài môi trường đã ghi.
 
 Ngày 18/11 rà soát lại readiness: remaining-requested.md là backlog hiện hành, các ghi chú schema cũ là lịch sử. R2 còn activation-required/10042 và workflow backup trên main còn 404. Không đổi code, không có lượt test/build/deploy mới trong lần cập nhật này.
+
+Ngày 18/11 sau quyền push riêng: 97666f7 đã lên main; GitHub CI 44309618580 completed/success (178 API, 26 Python; Flutter analyze/test, crash recovery, Windows/Web release build). Sửa gate đọc Environment sau khi job được gán; thiếu hai cờ không export/upload. R2 vẫn 10042 và tài liệu nhà cung cấp yêu cầu checkout/subscription, nên không kích hoạt trong quyền không bật thanh toán. Xem github-publish-backup.md.

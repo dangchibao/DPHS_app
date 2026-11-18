@@ -41,7 +41,7 @@ Lượt thực ngày 18/11 đạt với SQL xuất từ database E2E có giao d�
 
 - R2 vẫn trả 10042/chưa kích hoạt. Chủ cần tự xem điều kiện kích hoạt/chi phí của Cloudflare; chưa tự bật subscription hoặc phương thức thanh toán.
 - Cần bucket R2 Standard private và token/S3 credentials quyền tối thiểu, đặt vào secrets theo cloud-backup.md; không gửi qua chat.
-- Repository dangchibao/DPHS_app là public. Connector đọc được repo nhưng workflow backup chưa có trên nhánh mặc định. File đã chuẩn bị trong workspace; chưa push theo AGENTS.md. Quyền push của connector không thay cho phép xuất bản.
+- Repository dangchibao/DPHS_app là public. Ngày 18/11 người dùng đã cho phép riêng và source/workflow được push main tại commit 97666f7. Chưa cấu hình secrets R2 hoặc bật lịch; private key không được xuất bản. Xem ../phases/github-publish-backup.md.
 - Khi đủ bucket/secrets/workflow, chạy thủ công và kiểm upload→download/hash→giải mã/restore trước khi bật hai variable xác nhận lịch. Không coi job bị skip là đã sao lưu.
 
 Giữ passphrase tách khỏi private key khi lưu ngoài máy. Không công khai ciphertext hoặc SQL của cửa hàng. Mã hóa không thay bản sao độc lập và diễn tập khôi phục định kỳ.

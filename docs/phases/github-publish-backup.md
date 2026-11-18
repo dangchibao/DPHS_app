@@ -23,3 +23,6 @@ Kiểm tra Wrangler được xác thực nhưng R2 vẫn activation-required/100
 Tình trạng commit/push và CI GitHub được ghi sau khi có phản hồi thực từ remote. Kết quả test trên đây là chạy local, không suy thành GitHub CI đã đạt.
 
 Đề xuất: không thêm tính năng.
+## Xác nhận remote
+
+Đã commit/push 197 tệp thay đổi tại 97666f70b10517362a2c6b5947147818343cd216, fast-forward main. git ls-remote xác nhận đúng SHA; working tree sạch sau push. GitHub CI run [44309618580](https://github.com/dangchibao/DPHS_app/actions/runs/44309618580) đã completed/success cho đúng SHA này. Ubuntu: 178 test API, typecheck/lint/build dry-run và 26 test Python đạt, không skip. Windows: Flutter analyze/test, crash-recovery, Windows release và Web release build đều đạt. Workflow backup trên main đọc được và có gate mới; chưa chạy upload R2 hoặc bật lịch. Không upload artifacts/khóa hoặc đổi staging/production. Các ghi chú 'workflow chưa push' ở báo cáo cũ là lịch sử trước quyền mới.

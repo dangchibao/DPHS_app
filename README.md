@@ -69,3 +69,7 @@ Cập nhật 18/11: [POS offline qua Cloudflare thật và khóa backup](docs/ph
 Hotfix Web 18/11: [ghi nhớ cấu hình đăng nhập](docs/phases/web-login-identity.md) đã lên staging. Lưu cặp ID sau login/enroll trong một record, tự điền khi mở lại, không ghi đè ID tự chọn và không lưu token/mật khẩu/quyền. 209 test Flutter toàn bộ đạt, analyze sạch; build/deploy/HTTPS hash và Chrome mobile đạt. [Hướng dẫn đăng nhập hiện hành](docs/operations/staging-access.md). API/native không đổi; chưa bật R2 hoặc push GitHub.
 
 Rà soát nghiệm thu 18/11: [danh sách hiện hành](docs/phases/remaining-requested.md) đã thay backlog cũ, ánh xạ đủ các nhóm tính năng và ghi rõ R2/workflow/khóa độc lập/nghiệm thu còn thiếu. Lượt này chỉ kiểm tra trạng thái tài khoản và cập nhật tài liệu; không có code nghiệp vụ, deploy hoặc test mới.
+
+Xuất bản 18/11 sau khi được phép riêng: source và workflow backup đã lên main tại 97666f7. [Hồ sơ kiểm chứng](docs/phases/github-publish-backup.md). 209 Flutter/178 API đạt; 23 test Python backup/restore/key và 3 test gate mới đạt. R2 còn yêu cầu kích hoạt subscription, chưa bật thanh toán hoặc lịch backup. Không thay production.
+
+GitHub CI cho 97666f7 đã đạt: [run 44309618580](https://github.com/dangchibao/DPHS_app/actions/runs/44309618580). Ubuntu API/26 test Python và Windows Flutter/test/crash-recovery/build Windows/Web đều xanh. Chưa có bản backup R2 hằng đêm được nghiệm thu.
