@@ -150,3 +150,5 @@ Ngày 18/11 rà soát lại readiness: remaining-requested.md là backlog hiện
 Ngày 18/11 sau quyền push riêng: 97666f7 đã lên main; GitHub CI 44309618580 completed/success (178 API, 26 Python; Flutter analyze/test, crash recovery, Windows/Web release build). Sửa gate đọc Environment sau khi job được gán; thiếu hai cờ không export/upload. R2 vẫn 10042 và tài liệu nhà cung cấp yêu cầu checkout/subscription, nên không kích hoạt trong quyền không bật thanh toán. Xem github-publish-backup.md.
 
 Quyết định sau cùng 18/11: miễn phí toàn bộ, bỏ yêu cầu R2/subscription. free-operation.md ghi 37 test Python đạt và backup D1 mã hóa về Windows, giải mã/restore keyring mới đạt; Task Scheduler thực result 0 tạo ciphertext mới. Lịch 02:30/logon cần máy bật/đăng nhập/mạng. Backup độc lập ngoài máy và phần cứng thực vẫn chưa nghiệm thu. Không deploy hoặc sửa nghiệp vụ.
+
+CI cuối phương án không R2: 44318069680 completed/success cho b6f79bb, 178 API/37 Python/209 Flutter, analyze/crash-recovery/build Windows/Web đạt. Task Windows vẫn Ready/result 0, Verify ciphertext do task tạo đạt. Không dùng R2, không deploy hoặc bật phí.

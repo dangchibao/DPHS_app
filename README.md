@@ -79,3 +79,5 @@ Xuất bản 18/11 sau khi được phép riêng: source và workflow backup đ�
 GitHub CI cho 97666f7 đã đạt: [run 44309618580](https://github.com/dangchibao/DPHS_app/actions/runs/44309618580). Ubuntu API/26 test Python và Windows Flutter/test/crash-recovery/build Windows/Web đều xanh. Chưa có bản backup R2 hằng đêm được nghiệm thu.
 
 Quyết định miễn phí mới nhất 18/11: [không dùng R2, backup D1 về Windows](docs/phases/free-operation.md). 37 test Python đạt; đã export/mã hóa/đọc lại hash/giải mã-restore thật và chạy Task Scheduler thành công (result 0). Lịch 02:30 và khi đăng nhập, máy phải bật/có mạng/phiên Cloudflare hợp lệ. Chưa xác minh bản sao ngoài máy. Không yêu cầu bạn kích hoạt R2; workflow R2 cũ bỏ cron/khóa job.
+
+CI cho phương án không R2 đã đạt: [44318069680](https://github.com/dangchibao/DPHS_app/actions/runs/44318069680), source b6f79bb: 178 API/37 Python/209 Flutter, crash-recovery và build Windows/Web. Xem docs/operations/free-operation.md để kiểm tra lịch backup Windows và các giới hạn Free.

@@ -27,3 +27,7 @@ Workers/D1 Free có hạn mức; không hứa tải/dung lượng vô hạn. Kh�
 
 [Cách chạy/kiểm tra lịch và khôi phục](../operations/free-operation.md). Đề xuất: không thêm tính năng ngoài yêu cầu.
 Bổ sung kiểm chứng cuối: lệnh Verify tái lập được từ wrapper, đã nhập private export vào keyring mới để giải mã/restore chính ciphertext do Task Scheduler tạo thành công. Ba test bổ sung chặn thiếu passphrase, trạng thái backup failed và ciphertext bị sửa trước khi đọc private key. Task vẫn Ready/result 0 sau kiểm tra cuối.
+
+## Xuất bản và CI cuối
+
+Đã push phương án mới tại 43a79ae và hoàn thiện Status tại b6f79bb. [GitHub CI 44318069680](https://github.com/dangchibao/DPHS_app/actions/runs/44318069680) cho b6f79bb completed/success: 178 API, 37 Python trên Ubuntu; Flutter analyze/209 test, crash-recovery, Windows release và Web release trên Windows đều đạt. Bản cập nhật tài liệu sau đó không thay code hay triển khai cloud. Không bật subscription hoặc thanh toán.
