@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'package:material_ui/material_ui.dart';
 
 import '../../core/local_service.dart';
+import '../audit/document_audit_button.dart';
 import '../../core/auth/permissions.dart';
 import '../pos/pos_page.dart';
 import '../pos/sales_service.dart';
@@ -147,6 +148,10 @@ class _ReservationsPageState extends State<ReservationsPage> {
                     ),
                     Text(
                       '${meta['customer_name']} · ${meta['phone']}\nHạn giữ: $expiry (giờ Việt Nam)${own ? '' : ' · Thiết bị khác'}',
+                    ),
+                    DocumentAuditButton(
+                      service: widget.service,
+                      documentId: row['id'] as String,
                     ),
                     if (active && own)
                       Wrap(

@@ -7,6 +7,7 @@ import 'package:flutter/foundation.dart';
 import '../local_service.dart';
 import '../auth/permissions.dart';
 import 'cloud_api.dart';
+import '../media/media_service.dart';
 
 const maxSyncMutations = 3;
 const payrollFeedTables = {
@@ -33,11 +34,13 @@ class SyncEngine extends ChangeNotifier {
   final CloudApi api;
   SyncStatus status = SyncStatus.offline;
   int pending = 0, failures = 0;
+  int mediaPending = 0;
   String? detail;
   Timer? _poll, _debounce, _retry;
   bool _running = false, _stopped = true;
   DateTime? nextRetryAt;
   bool _disposed = false;
+  bool mediaEnabled = false;
   Completer<void>? _completion;
   Future<void> pauseAndDrain() async {
     stop();
@@ -74,6 +77,12 @@ class SyncEngine extends ChangeNotifier {
               [service.storeId],
             )).single['n']
             as int;
+    mediaPending =
+        (await service.db.rows(
+              'SELECT COUNT(*) AS n FROM media_outbox WHERE store_id=? AND device_id=?',
+              [service.storeId, service.deviceId],
+            )).single['n']
+            as int;
     if (!_disposed) notifyListeners();
   }
 
@@ -102,8 +111,20 @@ class SyncEngine extends ChangeNotifier {
         await service.acceptOnlineReconnect(remote);
       }
       final directory = await api.send('/directory');
+      mediaEnabled = directory['media_enabled'] == true;
+      final frozenActor = (directory['users'] as List).any(
+        (r) =>
+            (r as Map)['frozen'] == 1 &&
+            (r['id'] == api.currentUserId ||
+                r['id'] == service.session?.userId),
+      );
+      final handoffs = [
+        for (final r in directory['handoffs'] as List? ?? [])
+          Map<String, Object?>.from(r as Map),
+      ];
       var accessChanged = false;
       await service.db.transaction(() async {
+        await service.acceptAuditHead(directory['audit_head']);
         if (directory.containsKey('transfer_targets')) {
           await service.db.execute(
             "INSERT INTO local_settings VALUES ('transfer_targets',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",
@@ -166,9 +187,33 @@ class SyncEngine extends ChangeNotifier {
               row['updated_at'],
             ],
           );
+          if (row['frozen'] == 1) {
+            await service.db.execute('UPDATE users SET active=0 WHERE id=?', [
+              row['id'],
+            ]);
+            await service.db.execute(
+              'UPDATE employee_store_assignments SET active=0 WHERE store_id=? AND user_id=?',
+              [service.storeId, row['id']],
+            );
+            await service.db.execute('DELETE FROM local_settings WHERE key=?', [
+              'grant:${row['id']}',
+            ]);
+          }
         }
         final actor = service.session;
         if (actor != null) {
+          if ((directory['users'] as List).any(
+            (r) => (r as Map)['id'] == actor.userId && r['frozen'] == 1,
+          )) {
+            service.session = LocalSession(
+              userId: actor.userId,
+              name: actor.name,
+              role: actor.role,
+              storeId: actor.storeId,
+              deviceId: actor.deviceId,
+              expiresAt: service.clock(),
+            );
+          }
           final current =
               (directory['users'] as List)
                       .where((raw) => (raw as Map)['id'] == actor.userId)
@@ -308,9 +353,13 @@ class SyncEngine extends ChangeNotifier {
       for (final scope in [
         'global',
         'store',
-        if ([Role.owner, Role.manager].contains(service.session?.role)) 'audit',
-        if (service.session?.can(Permission.attendance) == true) 'attendance',
-        if (service.session?.can(Permission.payroll) == true) 'payroll',
+        if (!frozenActor &&
+            [Role.owner, Role.manager].contains(service.session?.role))
+          'audit',
+        if (!frozenActor && service.session?.can(Permission.attendance) == true)
+          'attendance',
+        if (!frozenActor && service.session?.can(Permission.payroll) == true)
+          'payroll',
       ]) {
         var remaining = false;
         final key = scope == 'global'
@@ -363,6 +412,9 @@ class SyncEngine extends ChangeNotifier {
                 'commercial_rules',
                 'tailoring_rules',
                 'size_rules',
+                'bank_accounts',
+                'stock_threshold_rules',
+                'media_objects',
                 'transfer_events',
                 'transfer_receipts',
                 'transfer_offers',
@@ -398,6 +450,7 @@ class SyncEngine extends ChangeNotifier {
                     'commercial_rules',
                     'tailoring_rules',
                     'size_rules',
+                    'bank_accounts',
                   ].contains(table)) {
                 await service.db.execute(
                   'INSERT INTO $table (${columns.join(',')}) VALUES (${columns.map((_) => '?').join(',')}) ON CONFLICT(id) DO UPDATE SET ${columns.where((c) => c != 'id').map((c) => '$c=excluded.$c').join(',')} WHERE excluded.lww_key>$table.lww_key',
@@ -493,9 +546,42 @@ class SyncEngine extends ChangeNotifier {
         }
       }
       failures = 0;
+      if (caughtUp &&
+          (await service.db.rows(
+            'SELECT id FROM outbox WHERE store_id=? LIMIT 1',
+            [service.storeId],
+          )).isEmpty) {
+        final cursor =
+            (await service.db.rows(
+              'SELECT server_seq FROM sync_cursors WHERE store_id=?',
+              [service.storeId],
+            )).firstOrNull?['server_seq'] ??
+            0;
+        for (final request in handoffs.where((h) => h['requires_ack'] == 1)) {
+          try {
+            await api.send(
+              '/staff/handoffs/ack',
+              body: {'id': request['id'], 'drained': true, 'cursor': cursor},
+            );
+          } on CloudError catch (error) {
+            if (error.status != 409) rethrow;
+          }
+        }
+      }
+      if (caughtUp &&
+          (await service.db.rows(
+            'SELECT id FROM outbox WHERE store_id=? LIMIT 1',
+            [service.storeId],
+          )).isEmpty) {
+        await service.syncProductImages(enabled: mediaEnabled);
+      }
       await count();
       nextRetryAt = null;
-      if (caughtUp && pending == 0 && directory['schema_version'] == 22) {
+      if (caughtUp &&
+          !frozenActor &&
+          pending == 0 &&
+          directory['schema_version'] is int &&
+          (directory['schema_version'] as int) >= 22) {
         final day = service
             .clock()
             .toUtc()

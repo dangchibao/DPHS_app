@@ -14,7 +14,7 @@ Số lương dùng payroll_feed riêng (store_id,server_seq), chỉ phiên tươ
 
 Có bảng lương theo tháng toàn cửa hàng, tổng phiếu đang hiệu lực bằng BigInt, lịch sử từng người và PDF A5 tiếng Việt. Phiếu hủy/cần đối soát có cảnh báo; PDF không xác nhận đã chi trả. Đã tạo mẫu QA và render Poppler, kiểm tra trực quan một trang A5 không tràn.
 
-Kiểm chứng hiện tại: 129 test API đạt, typecheck/lint/Worker dry-run và D1 local migration 22 đạt. 165 test Flutter toàn bộ đạt trước bổ sung bảng tổng tháng; nhóm payroll service/sync/UI/PDF đã đạt, kiểm tra toàn bộ sau bổ sung đang chạy. Smoke HTTP workerd/database riêng đạt cấu hình/preview/chốt/replay/feed riêng/khóa công/rejection/hủy/phát hành lại, cùng các luồng cũ đăng nhập/thiết bị/CK. Không deploy cloud. Số kiểm thử cuối cập nhật sau khi chạy thành công.
+Kiểm chứng hiện tại: 129 test API đạt, typecheck/lint/Worker dry-run và D1 local migration 22 đạt. 166 test Flutter toàn bộ và analyze đạt sau bổ sung bảng tổng tháng; build Windows release 0.6.0+6/schema 22 đạt. Smoke HTTP workerd/database riêng đạt cấu hình/preview/chốt/replay/feed riêng/khóa công/rejection/hủy/phát hành lại, cùng các luồng cũ đăng nhập/thiết bị/CK. Không deploy cloud. Phiếu A5 mẫu đã render và kiểm tra trực quan.
 
 Source 0.6.0+6/schema 22 chưa đóng gói; ZIP/APK 0.5.0 vẫn schema 21, chưa có module lương. API source yêu cầu schema tối thiểu 22. Chạy ./scripts/dev.ps1, đăng nhập chủ/kế toán → Lương · phiếu lương; cấu hình, đồng bộ, đối soát tháng và xem phiếu. Chỉ dùng dữ liệu thử.
 

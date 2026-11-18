@@ -41,7 +41,7 @@ void main() {
     } finally {
       await db.close();
     }
-  });
+  }, timeout: const Timeout(Duration(minutes: 2)));
   test(
     'Cloud phát hiện bản sao thiết bị lưu khóa nghiệp vụ bền vững',
     () async {

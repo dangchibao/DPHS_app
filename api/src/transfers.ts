@@ -173,7 +173,7 @@ export async function validateTransfers(
         );
       const target = await db
         .prepare(
-          "SELECT d.code AS device_code,s.code AS store_code FROM devices d JOIN stores s ON s.id=d.store_id WHERE d.store_id=? AND d.id=? AND d.status='approved' AND s.active=1",
+          "SELECT d.code AS device_code,s.code AS store_code FROM devices d JOIN stores s ON s.id=d.store_id WHERE d.store_id=? AND d.id=? AND d.status='approved' AND d.kind='native' AND s.active=1",
         )
         .bind(
           text(meta.target_store_id, "Cửa hàng nhận"),
@@ -402,7 +402,7 @@ export async function validateTransfers(
       const meta = object(doc.metadata_json);
       const target = await db
         .prepare(
-          "SELECT d.id FROM devices d JOIN stores s ON s.id=d.store_id WHERE d.store_id=? AND d.id=? AND d.status='approved' AND s.active=1",
+          "SELECT d.id FROM devices d JOIN stores s ON s.id=d.store_id WHERE d.store_id=? AND d.id=? AND d.status='approved' AND d.kind='native' AND s.active=1",
         )
         .bind(meta.target_store_id, meta.target_device_id)
         .first();

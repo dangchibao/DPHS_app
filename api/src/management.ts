@@ -29,7 +29,7 @@ export async function management(
     const result = await db.batch([
       db.prepare("SELECT * FROM stores ORDER BY code"),
       db.prepare(
-        "SELECT id,store_id,code,name,status,created_at,CASE WHEN installation_hash IS NULL THEN 0 ELSE 1 END AS claimed FROM devices ORDER BY store_id,code",
+        "SELECT id,store_id,code,name,status,kind,created_at,CASE WHEN installation_hash IS NULL THEN 0 ELSE 1 END AS claimed FROM devices ORDER BY store_id,code",
       ),
       db.prepare(
         "SELECT id,username,display_name,active FROM users ORDER BY display_name",
@@ -75,6 +75,9 @@ export async function management(
   if (!store)
     throw new ApiError(404, "Không tìm thấy cửa hàng đang hoạt động.");
   if (body.action === "invite_device") {
+    const kind = body.kind ?? "native";
+    if (kind !== "native" && kind !== "web")
+      throw new ApiError(400, "Loại thiết bị không hợp lệ.");
     const id = uuid(body.id),
       code = text(body.code, "Mã máy", 12).toUpperCase(),
       name = text(body.name, "Tên máy");
@@ -85,9 +88,9 @@ export async function management(
     await db.batch([
       db
         .prepare(
-          "INSERT INTO devices(id,store_id,code,name,status,created_at) VALUES (?,?,?,?,'pending',?)",
+          "INSERT INTO devices(id,store_id,code,name,status,created_at,kind) VALUES (?,?,?,?,'pending',?,?)",
         )
-        .bind(id, storeId, code, name, now),
+        .bind(id, storeId, code, name, now, kind),
       db
         .prepare("INSERT INTO device_enrollments VALUES (?,?,?,?,?,?)")
         .bind(
@@ -102,6 +105,7 @@ export async function management(
         store_id: storeId,
         code,
         name,
+        kind,
         expires_at: expiry,
       }),
     ]);
@@ -144,6 +148,11 @@ export async function management(
         .bind(status, storeId, id),
       db
         .prepare(
+          "INSERT OR IGNORE INTO staff_change_devices SELECT ?,h.id,?,NULL,NULL FROM staff_change_requests h JOIN devices d ON d.store_id=? AND d.id=? WHERE ?='approved' AND d.kind='native' AND h.status='pending' AND EXISTS(SELECT 1 FROM json_each(h.scope_json) WHERE value=?)",
+        )
+        .bind(storeId, id, storeId, id, status, storeId),
+      db
+        .prepare(
           "UPDATE sessions SET revoked=1 WHERE store_id=? AND device_id=?",
         )
         .bind(storeId, id),
@@ -162,6 +171,18 @@ export async function management(
     // Thêm cửa hàng; không hủy quyền cũ khi còn giao dịch offline chưa đối soát.
     const userId = text(body.user_id, "Nhân viên"),
       role = text(body.role, "Vai trò") as Role;
+    if (
+      await db
+        .prepare(
+          "SELECT id FROM staff_change_requests WHERE global_lock=1 AND status='pending' AND user_id=? LIMIT 1",
+        )
+        .bind(userId)
+        .first()
+    )
+      throw new ApiError(
+        409,
+        "Nhân viên đang bàn giao toàn hệ thống; hoàn tất hoặc hủy trước khi thêm cửa hàng.",
+      );
     if (
       !["owner", "manager", "cashier", "warehouse", "accountant"].includes(role)
     )
@@ -210,16 +231,22 @@ export async function enrollDevice(
     throw new ApiError(400, "Mã đăng ký/cài đặt không hợp lệ.");
   const enrollment = await db
     .prepare(
-      "SELECT e.store_id,e.device_id,d.installation_hash FROM device_enrollments e JOIN stores s ON s.id=e.store_id JOIN devices d ON d.store_id=e.store_id AND d.id=e.device_id WHERE e.token_hash=? AND e.expires_at>? AND s.active=1 AND d.status<>'revoked'",
+      "SELECT e.store_id,e.device_id,d.installation_hash,d.kind FROM device_enrollments e JOIN stores s ON s.id=e.store_id JOIN devices d ON d.store_id=e.store_id AND d.id=e.device_id WHERE e.token_hash=? AND e.expires_at>? AND s.active=1 AND d.status<>'revoked'",
     )
     .bind(await sha256(token), new Date().toISOString())
     .first<{
       store_id: string;
       device_id: string;
       installation_hash: string | null;
+      kind: string;
     }>();
   if (!enrollment)
     throw new ApiError(403, "Mã đăng ký sai, hết hạn hoặc máy đã thu hồi.");
+  if (enrollment.kind !== (body.kind ?? "native"))
+    throw new ApiError(
+      403,
+      "Mã đăng ký không đúng loại thiết bị. Hãy xin mã riêng cho trình duyệt hoặc máy bán hàng.",
+    );
   const hash = await sha256(installation);
   const statements = [
     db

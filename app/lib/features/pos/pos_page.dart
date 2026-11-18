@@ -6,6 +6,9 @@ import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 
 import '../../core/local_service.dart';
+import '../settings/bank_account.dart';
+import '../settings/bank_account_page.dart';
+import '../../core/media/product_image.dart';
 import 'sales_service.dart';
 import '../schools/school_service.dart';
 import '../catalog/combo_pages.dart';
@@ -367,8 +370,10 @@ class _PosPageState extends State<PosPage> {
     Map<String, List<Map<String, Object?>>> directory;
     List<CommercialRule> offers;
     List<Map<String, Object?>> dealers;
+    BankAccount? transferAccount;
     try {
       directory = await widget.service.schoolDirectory();
+      transferAccount = await widget.service.bankAccount();
       offers = (await widget.service.commercialRules(activeOnly: true))
           .map(CommercialRule.fromRow)
           .toList();
@@ -541,16 +546,7 @@ class _PosPageState extends State<PosPage> {
                               setDialog(() => method = selection.single),
                   ),
                   if (method == 'bank')
-                    const Padding(
-                      padding: EdgeInsets.symmetric(vertical: 14),
-                      child: ListTile(
-                        leading: Icon(Icons.qr_code_2, size: 42),
-                        title: Text('QR chuyển khoản'),
-                        subtitle: Text(
-                          'Chưa cấu hình mã QR của cửa hàng. Chỉ ghi nhận tiền thực tế đã nhận.',
-                        ),
-                      ),
-                    ),
+                    BankTransferDetails(account: transferAccount),
                   const SizedBox(height: 16),
                   TextField(
                     controller: received,
@@ -1096,13 +1092,13 @@ class _PosPageState extends State<PosPage> {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                const Expanded(
+                                Expanded(
                                   child: Center(
-                                    child: Icon(
+                                    child: ProductImage(service:widget.service,reference:p['image_path'] as String?,fallback:const Icon(
                                       Icons.checkroom,
                                       size: 44,
                                       color: Color(0xff6c95cb),
-                                    ),
+                                    )),
                                   ),
                                 ),
                                 Text(

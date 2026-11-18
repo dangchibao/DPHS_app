@@ -19,6 +19,16 @@ void main() {
       final bytes = await payrollPdf(s, 'run1');
       expect(ascii.decode(bytes.take(5).toList()), '%PDF-');
       expect(bytes.length, greaterThan(10000));
+      expect(
+        await s.db.rows(
+          "SELECT id FROM audit_logs WHERE action='PAYROLL_SLIP_VIEW'",
+        ),
+        hasLength(1),
+      );
+      expect(
+        jsonEncode(await s.db.rows('SELECT * FROM audit_logs')),
+        isNot(contains('10400000')),
+      );
       if (const bool.fromEnvironment('WRITE_PAYROLL_QA')) {
         final directory = Directory('../artifacts/output/pdf');
         await directory.create(recursive: true);

@@ -8,6 +8,7 @@ import {
 } from "../src/payroll";
 import { push, pull } from "../src/sync";
 import type { Actor } from "../src/auth";
+import { auditStatement } from "../src/audit";
 const id = (n: number) =>
   `019c4b00-0000-7000-8000-${String(n).padStart(12, "0")}`;
 const actor: Actor = {
@@ -45,6 +46,9 @@ function fixture() {
   INSERT INTO documents VALUES('dh','s1','d1','DH','reservation','DH-test','2020-01-10T00:00:00.000Z','u1',NULL,NULL,999999,0,999999,'2020','{}');
   INSERT INTO documents VALUES('ck','s1','d1','CK','transfer_out','CK-test','2020-01-10T00:00:00.000Z','u1',NULL,NULL,0,0,0,'2020','{}');
   INSERT INTO attendance_entries VALUES('a','s1','d1','u1','u1','2020-01-10',1,'Nửa ngày','2020-01-10T00:00:00.000Z','1'),('b','s1','d1','u1','u1','2020-01-10',2,'Đủ ngày','2020-01-10T01:00:00.000Z','2'),('c','s1','d1','u1','u1','2020-01-11',1,'Nửa ngày','2020-01-11T00:00:00.000Z','1');`);
+  d.sqlite.exec(
+    "INSERT INTO stores VALUES('other','NT-CN02','Khác',1,'2019-01-01'); INSERT INTO devices(id,store_id,code,name,status,created_at) VALUES('other-device','other','B2','Khác','approved','2019-01-01'); INSERT INTO employee_store_assignments VALUES('other-assignment','other','u1','owner',1,'2019-01-01');",
+  );
   return d;
 }
 function command(n: number, kind: string, payload: unknown, extra = {}) {
@@ -182,6 +186,14 @@ it("Lương CAS/idempotent, không đưa số lương vào feed/audit công khai
       await payrollPull(d.db, actor, new URL("https://test/payroll/pull"))
     ).text();
     expect(privateFeed).toContain("5200000");
+    await payrollPull(d.db, actor, new URL("https://test/payroll/pull"));
+    expect(
+      d.sqlite
+        .prepare(
+          "SELECT COUNT(*) AS n FROM audit_logs WHERE action='PAYROLL_ACCESS'",
+        )
+        .get()?.n,
+    ).toBe(1);
     for (const role of ["manager", "cashier", "warehouse"] as const)
       await expect(
         payrollPull(
@@ -224,6 +236,19 @@ it("Nguồn doanh số đúng HD/MR + món thay DT − credit gốc; chốt/khó
   try {
     await setup(d);
     const quote = await payrollPreview(d.db, actor, "u1", "2020-01");
+    await d.db.batch([
+      await auditStatement(
+        d.db,
+        actor,
+        "PAYROLL_COMMAND_QUEUE",
+        id(2),
+        "Lập yêu cầu lương",
+        { command_id: id(2) },
+      ),
+    ]);
+    expect(
+      (await payrollPreview(d.db, actor, "u1", "2020-01")).quote_hash,
+    ).toBe(quote.quote_hash);
     expect(quote.sources).toMatchObject({
       net_sales: 1010000,
       attendance_units: 3,
@@ -431,7 +456,12 @@ it("Giao dịch tới muộn đánh dấu đối soát, không sửa snapshot ph
         (await (
           await payrollPull(
             d.db,
-            { ...actor, store_id: "other" },
+            {
+              ...actor,
+              store_id: "other",
+              device_id: "other-device",
+              session_id: "other-session",
+            },
             new URL("https://test/payroll/pull"),
           )
         ).json()) as { events: unknown[] }

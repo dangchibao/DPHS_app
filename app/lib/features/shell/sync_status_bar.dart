@@ -30,7 +30,7 @@ class SyncStatusBar extends StatelessWidget {
                 child: Tooltip(
                   message: sync?.detail ?? 'Dữ liệu được lưu trên thiết bị',
                   child: Text(
-                    '${sync?.label ?? 'Chưa kết nối cloud'}${sync == null ? '' : ' · ${sync.pending} thay đổi chờ gửi'}',
+                    '${sync?.label ?? 'Chưa kết nối cloud'}${sync == null ? '' : ' · ${sync.pending} thay đổi chờ gửi'}${sync != null && sync.mediaPending > 0 ? ' · ${sync.mediaPending} ảnh ${sync.mediaEnabled ? 'chờ gửi' : 'lưu máy, cloud chưa bật ảnh'}' : ''}',
                     style: const TextStyle(color: Color(0xff536b8b)),
                   ),
                 ),

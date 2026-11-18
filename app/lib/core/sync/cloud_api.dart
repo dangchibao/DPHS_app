@@ -1,8 +1,10 @@
 import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:http/http.dart' as http;
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter/foundation.dart';
+import 'package:uuid/uuid.dart';
 
 import '../auth/device_identity.dart';
 import '../auth/password.dart';
@@ -26,6 +28,7 @@ class CloudApi {
   String? token;
   String? currentUserId;
   String? currentUsername;
+  VoidCallback? onUnauthorized;
   ({String username, String salt, String proof, String store, String device})?
   _pendingLogin;
   bool get hasPendingLogin => _pendingLogin != null;
@@ -94,6 +97,7 @@ class CloudApi {
       );
     }
     if (response.statusCode >= 400) {
+      if (authenticated && response.statusCode == 401) onUnauthorized?.call();
       throw CloudError(
         response.statusCode,
         result['code'] as String? ?? 'HTTP_ERROR',
@@ -104,6 +108,160 @@ class CloudApi {
   }
 
   String _saltKey(String username) => 'cloud_salt:$baseUrl:$username';
+  Future<Uint8List> mediaBytes(
+    String hash, {
+    Uint8List? upload,
+    String? mutationId,
+    String? tokenOverride,
+  }) async {
+    if (!RegExp(r'^[a-f0-9]{64}$').hasMatch(hash)) {
+      throw ArgumentError('Mã ảnh không hợp lệ.');
+    }
+    final request = http.Request(
+      upload == null ? 'GET' : 'PUT',
+      cloudEndpoint(
+        baseUrl,
+        '/media/$hash',
+        allowDevelopmentHttp: !kReleaseMode,
+      ),
+    );
+    request.headers.addAll({
+      'Authorization': 'Bearer ${tokenOverride ?? token}',
+      'X-Client-Schema': '${AppDatabase.currentSchemaVersion}',
+      if (upload != null) 'Content-Type': 'image/jpeg',
+      'X-Mutation-ID': ?mutationId,
+    });
+    if (upload != null) {
+      if (upload.length > 204800) throw ArgumentError('Ảnh vượt 200KB.');
+      request.bodyBytes = upload;
+    }
+    final response = await client
+        .send(request)
+        .timeout(const Duration(seconds: 20));
+    final data = BytesBuilder(copy: false);
+    await for (final part in response.stream.timeout(
+      const Duration(seconds: 20),
+    )) {
+      if (data.length + part.length > 262144) {
+        throw StateError('Cloud trả ảnh quá lớn.');
+      }
+      data.add(part);
+    }
+    final bytes = data.takeBytes();
+    if (response.statusCode >= 400) {
+      if (response.statusCode == 401) onUnauthorized?.call();
+      Map<String, Object?> details = {};
+      try {
+        details = Map<String, Object?>.from(
+          jsonDecode(utf8.decode(bytes)) as Map,
+        );
+      } catch (_) {
+        /* Không phải JSON khi cloud vượt hạn mức. */
+      }
+      throw CloudError(
+        response.statusCode,
+        details['code'] as String? ?? 'MEDIA_HTTP',
+        details['error'] as String? ??
+            'Không đồng bộ được ảnh. Ảnh vẫn lưu trên máy.',
+      );
+    }
+    return bytes;
+  }
+
+  Future<Uint8List> archiveBytes(String id, {Uint8List? upload}) async {
+    if (!RegExp(r'^[a-f0-9-]{36}$').hasMatch(id)) {
+      throw ArgumentError('ID file không hợp lệ.');
+    }
+    if (upload != null && upload.length > 194000) {
+      throw ArgumentError('File quá lớn.');
+    }
+    final request = http.Request(
+      upload == null ? 'GET' : 'PUT',
+      cloudEndpoint(
+        baseUrl,
+        '/audit/archives/$id',
+        allowDevelopmentHttp: !kReleaseMode,
+      ),
+    );
+    request.headers.addAll({
+      'Authorization': 'Bearer $token',
+      'X-Client-Schema': '${AppDatabase.currentSchemaVersion}',
+      if (upload != null) 'Content-Type': 'application/gzip',
+    });
+    if (upload != null) request.bodyBytes = upload;
+    final response = await client
+        .send(request)
+        .timeout(const Duration(seconds: 20));
+    final bytes = BytesBuilder(copy: false);
+    await for (final part in response.stream.timeout(
+      const Duration(seconds: 20),
+    )) {
+      if (bytes.length + part.length > 194000) {
+        throw StateError('File trả về quá lớn.');
+      }
+      bytes.add(part);
+    }
+    final data = bytes.takeBytes();
+    if (response.statusCode >= 400) {
+      if (response.statusCode == 401) onUnauthorized?.call();
+      Map<String, dynamic> error = {};
+      try {
+        error = jsonDecode(utf8.decode(data)) as Map<String, dynamic>;
+      } catch (_) {
+        /* Lỗi proxy/quota có thể không phải JSON. */
+      }
+      throw CloudError(
+        response.statusCode,
+        error['code'] as String? ?? 'ARCHIVE_HTTP',
+        error['error'] as String? ??
+            'Không đọc/lưu được kho nhật ký. Log vẫn được giữ nếu chưa chốt.',
+      );
+    }
+    if (upload != null) {
+      final ack = jsonDecode(utf8.decode(data)) as Map;
+      if (ack['id'] != id || ack['verified'] != true) {
+        throw StateError('Cloud chưa xác nhận file.');
+      }
+    }
+    return data;
+  }
+
+  /// Phiên Web chỉ giữ token trong RAM; không có sync token hoặc lease offline.
+  Future<Map<String, Object?>> loginWeb(
+    String username,
+    String password,
+    String store,
+    String device, {
+    String? installation,
+  }) async {
+    final challenge = await send(
+      '/auth/challenge',
+      body: {'username': username},
+      authenticated: false,
+    );
+    final response = await send(
+      '/auth/web/login',
+      authenticated: false,
+      body: {
+        'username': username,
+        'credential': await Passwords.cloudCredential(
+          password,
+          _challengeSalt(challenge),
+        ),
+        'store_id': store,
+        'device_id': device,
+        'installation_id': installation ?? await installationId(),
+      },
+    );
+    if (response.containsKey('sync_token')) {
+      throw StateError('Phiên Web không được cấp quyền đồng bộ offline.');
+    }
+    token = response['token'] as String;
+    currentUserId = (response['user'] as Map)['id'] as String;
+    currentUsername = username;
+    return response;
+  }
+
   String _challengeSalt(Map<String, Object?> challenge) {
     final salt = challenge['salt'];
     if (challenge['algorithm'] != 'PBKDF2-SHA256' ||
@@ -250,6 +408,8 @@ class CloudApi {
 
   Future<Map<String, Object?>> saveStaff(Map<String, Object?> input) async {
     final body = Map<String, Object?>.from(input);
+    body.putIfAbsent('id', () => const Uuid().v7());
+    body.putIfAbsent('change_id', () => const Uuid().v7());
     final password = body.remove('password') as String?;
     if (password != null) {
       final salt = Passwords.cloudSalt();

@@ -1,6 +1,10 @@
 import '../../core/local_service.dart';
 import '../../core/auth/permissions.dart';
 
+import 'dart:typed_data';
+
+import '../../core/media/media_service.dart';
+
 extension CatalogService on LocalService {
   Future<void> saveVariant({
     Map<String, Object?>? existing,
@@ -18,8 +22,10 @@ extension CatalogService on LocalService {
     required int price,
     required int cost,
     required int threshold,
+    bool imageChanged = false,
+    Uint8List? image,
   }) async {
-    require(Permission.catalog);
+    final actor = require(Permission.catalog);
     if ([
           name,
           category,
@@ -35,12 +41,16 @@ extension CatalogService on LocalService {
         cost < 0 ||
         price > 9007199254740991 ||
         cost > 9007199254740991 ||
-        threshold < 0) {
+        threshold < 0 ||
+        threshold > 9007199254740991) {
       throw ArgumentError(
         'Kiểm tra các trường bắt buộc, giá và ngưỡng cảnh báo.',
       );
     }
     await db.transaction(() async {
+      if (require(Permission.catalog).userId != actor.userId) {
+        throw StateError('Phiên đã thay đổi.');
+      }
       final productId =
               existing?['product_id'] as String? ?? parentId ?? uuid.v7(),
           variantId = existing?['id'] as String? ?? uuid.v7();
@@ -88,10 +98,48 @@ extension CatalogService on LocalService {
           ],
         );
       }
-      await db.execute(
-        'INSERT INTO store_variant_settings(store_id,variant_id,low_stock_threshold) VALUES (?,?,?) ON CONFLICT(store_id,variant_id) DO UPDATE SET low_stock_threshold=excluded.low_stock_threshold',
-        [storeId, variantId, threshold],
+      if (imageChanged) {
+        final reference = image == null ? null : await stageProductImage(image);
+        await db.execute('UPDATE products SET image_path=? WHERE id=?', [
+          reference,
+          productId,
+        ]);
+      }
+      final previousThreshold = await db.rows(
+        'SELECT low_stock_threshold FROM store_variant_settings WHERE store_id=? AND variant_id=?',
+        [storeId, variantId],
       );
+      final priorRules = await db.rows(
+        'SELECT id FROM stock_threshold_rules WHERE store_id=? AND variant_id=? LIMIT 1',
+        [storeId, variantId],
+      );
+      String? thresholdId;
+      if (priorRules.isEmpty ||
+          previousThreshold.isEmpty ||
+          previousThreshold.single['low_stock_threshold'] != threshold) {
+        thresholdId = uuid.v7();
+        final stamp = DateTime.fromMillisecondsSinceEpoch(
+          clock().toUtc().millisecondsSinceEpoch,
+          isUtc: true,
+        ).toIso8601String();
+        await db.execute(
+          'INSERT INTO stock_threshold_rules VALUES(?,?,?,?,?,?,?,?)',
+          [
+            thresholdId,
+            storeId,
+            deviceId,
+            actor.userId,
+            variantId,
+            threshold,
+            '$stamp|$deviceId|$thresholdId',
+            stamp,
+          ],
+        );
+      }
+      final actualThreshold = (await db.rows(
+        'SELECT low_stock_threshold FROM store_variant_settings WHERE store_id=? AND variant_id=?',
+        [storeId, variantId],
+      )).single['low_stock_threshold'];
       await audit(
         existing == null ? 'PRODUCT_CREATE' : 'PRODUCT_UPDATE',
         'variant',
@@ -106,6 +154,11 @@ extension CatalogService on LocalService {
                   'color': existing['color'],
                 },
           'after': {
+            'low_stock_threshold': actualThreshold,
+            'previous_threshold': previousThreshold.isEmpty
+                ? null
+                : previousThreshold.single['low_stock_threshold'],
+            'image_changed': imageChanged,
             'name': name,
             'price': price,
             'cost': cost,
@@ -117,6 +170,7 @@ extension CatalogService on LocalService {
       await enqueue('catalog', {
         'product_id': productId,
         'variant_id': variantId,
+        'threshold_id': ?thresholdId,
       }, 3);
     });
   }

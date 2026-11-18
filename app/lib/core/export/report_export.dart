@@ -6,6 +6,13 @@ import 'package:pdf/widgets.dart' as pw;
 import '../local_service.dart';
 import 'xlsx_export.dart';
 
+String safeReportFilename(String title) {
+  final cleaned = title
+      .replaceAll(RegExp(r'[<>:"/\\|?*\x00-\x1f]'), '_')
+      .trim();
+  return cleaned.length > 150 ? cleaned.substring(0, 150) : cleaned;
+}
+
 Future<bool> saveReportXlsx(
   LocalService service,
   String name,
@@ -20,7 +27,7 @@ Future<bool> saveReportXlsx(
     moneyColumns: moneyColumns,
   );
   final saved = await FilePicker.saveFile(
-    fileName: '$name.xlsx',
+    fileName: '${safeReportFilename(name)}.xlsx',
     bytes: bytes,
     mimeType:
         'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
@@ -31,17 +38,16 @@ Future<bool> saveReportXlsx(
       () => service.audit(
         'DATA_EXPORT',
         'report',
-        name,
+        service.uuid.v7(),
         reason: 'Xuất Excel',
-        changes: {'rows': rows.length, 'format': 'XLSX'},
+        changes: {'rows': rows.length, 'format': 'XLSX', 'name': name},
       ),
     );
   }
   return saved != null;
 }
 
-Future<bool> saveReportPdf(
-  LocalService service,
+Future<Uint8List> buildReportPdf(
   String name,
   List<String> headers,
   List<List<Object?>> rows,
@@ -75,10 +81,11 @@ Future<bool> saveReportPdf(
               [for (final value in row) value?.toString() ?? ''],
           ],
           headerStyle: pw.TextStyle(
-            fontSize: 8,
+            fontSize: 9,
             fontWeight: pw.FontWeight.bold,
           ),
-          cellStyle: const pw.TextStyle(fontSize: 7),
+          cellStyle: const pw.TextStyle(fontSize: 9),
+          headerDecoration:const pw.BoxDecoration(color:PdfColors.blue50),
           cellPadding: const pw.EdgeInsets.all(4),
         ),
       ],
@@ -91,9 +98,19 @@ Future<bool> saveReportPdf(
       ),
     ),
   );
+  return document.save();
+}
+
+Future<bool> saveReportPdf(
+  LocalService service,
+  String name,
+  List<String> headers,
+  List<List<Object?>> rows,
+) async {
+  final bytes = await buildReportPdf(name, headers, rows);
   final saved = await FilePicker.saveFile(
-    fileName: '$name.pdf',
-    bytes: await document.save(),
+    fileName: '${safeReportFilename(name)}.pdf',
+    bytes: bytes,
     mimeType: 'application/pdf',
     dialogTitle: 'Lưu báo cáo PDF',
   );
@@ -102,9 +119,9 @@ Future<bool> saveReportPdf(
       () => service.audit(
         'DATA_EXPORT',
         'report',
-        name,
+        service.uuid.v7(),
         reason: 'Xuất PDF',
-        changes: {'rows': rows.length, 'format': 'PDF'},
+        changes: {'rows': rows.length, 'format': 'PDF', 'name': name},
       ),
     );
   }

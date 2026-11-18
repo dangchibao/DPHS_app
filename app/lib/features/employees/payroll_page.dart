@@ -60,7 +60,7 @@ class _PayrollPageState extends State<PayrollPage> {
   @override
   void initState() {
     super.initState();
-    load();
+    load(userAction: true);
     widget.service.syncEngine?.addListener(onSync);
   }
 
@@ -80,9 +80,12 @@ class _PayrollPageState extends State<PayrollPage> {
     }
   }
 
-  Future<void> load() async {
+  Future<void> load({bool userAction = false}) async {
     setState(() => busy = true);
     try {
+      if (userAction) {
+        await widget.service.recordPayrollView(employee: employee);
+      }
       final roster = await widget.service.payrollEmployees();
       employee ??= roster.firstOrNull?['id'] as String?;
       final rows = await Future.wait([
@@ -293,7 +296,7 @@ class _PayrollPageState extends State<PayrollPage> {
               ? null
               : (value) {
                   employee = value;
-                  load();
+                  load(userAction: true);
                 },
         ),
         const SizedBox(height: 12),
@@ -317,7 +320,7 @@ class _PayrollPageState extends State<PayrollPage> {
               child: const Text('Đối soát · xem dự tính'),
             ),
             TextButton(
-              onPressed: busy ? null : load,
+              onPressed: busy ? null : () => load(userAction: true),
               child: const Text('Tải dữ liệu máy'),
             ),
           ],
@@ -392,11 +395,12 @@ class _PayrollPageState extends State<PayrollPage> {
                         onPressed: busy
                             ? null
                             : () => run(() async {
+                                final bytes = await payrollPdf(
+                                  widget.service,
+                                  row['id'] as String,
+                                );
                                 await Printing.layoutPdf(
-                                  onLayout: (_) => payrollPdf(
-                                    widget.service,
-                                    row['id'] as String,
-                                  ),
+                                  onLayout: (_) async => bytes,
                                   name: 'Phieu-luong-${row['id']}.pdf',
                                 );
                               }),

@@ -7,6 +7,17 @@ import '../../core/auth/permissions.dart';
 import '../../core/export/report_export.dart';
 
 const actionLabels = {
+  'AUDIT_ARCHIVE_PREPARE': 'Chuẩn bị lưu trữ nhật ký cũ',
+  'AUDIT_ARCHIVE_VERIFY': 'Xác minh file nhật ký cũ',
+  'AUDIT_ARCHIVE_COMMIT': 'Hoàn tất lưu trữ nhật ký cũ',
+  'AUDIT_ARCHIVE_CANCEL': 'Hủy lô lưu trữ nhật ký',
+  'AUDIT_ARCHIVE_DOWNLOAD': 'Tải file nhật ký cũ',
+  'PAYROLL_HISTORY_VIEW': 'Xem lịch sử lương online',
+  'PRODUCT_WEB_SAVE': 'Cập nhật sản phẩm trên Web',
+  'STAFF_HANDOFF_PREPARE': 'Chuẩn bị bàn giao nhân viên',
+  'STAFF_HANDOFF_CANCEL': 'Hủy yêu cầu bàn giao nhân viên',
+  'BANK_ACCOUNT_SAVE': 'Cấu hình tài khoản chuyển khoản',
+  'BANK_ACCOUNT_SYNC': 'Tiếp nhận cấu hình chuyển khoản',
   'COMBO_SAVE': 'Cập nhật giá / thành phần combo',
   'COMMERCIAL_SAVE': 'Cập nhật bảng giá / khuyến mãi',
   'DEALER_SAVE': 'Cập nhật đại lý',
@@ -78,6 +89,10 @@ class _AuditPageState extends State<AuditPage> {
   @override
   void initState() {
     super.initState();
+    if (widget.entityId != null) {
+      from = DateTime.utc(2000);
+    }
+    to = widget.service.clock().toUtc().add(const Duration(days: 1));
     load();
   }
 
@@ -104,8 +119,8 @@ class _AuditPageState extends State<AuditPage> {
 
     if (widget.entityId != null) {
       where(
-        "(a.entity_id=? OR json_extract(a.changes_json,'\$.original_id')=?)",
-        [widget.entityId, widget.entityId],
+        "(a.entity_id=? OR json_extract(a.changes_json,'\$.original_id')=? OR json_extract(a.changes_json,'\$.source_id')=?)",
+        [widget.entityId, widget.entityId, widget.entityId],
       );
     }
     if (action.isNotEmpty) where('a.action=?', [action]);
@@ -166,8 +181,9 @@ class _AuditPageState extends State<AuditPage> {
           alerts = [
             if ((count['LOGIN_FAILED'] ?? 0) >= 5)
               '${count['LOGIN_FAILED']} lần đăng nhập sai trong 24 giờ',
-            if ((count['INVOICE_CANCEL'] ?? 0) >= 5)
-              '${count['INVOICE_CANCEL']} hóa đơn bị hủy trong 24 giờ',
+            if ((count['INVOICE_CANCEL'] ?? 0) + (count['INVOICE_VOID'] ?? 0) >=
+                5)
+              '${(count['INVOICE_CANCEL'] ?? 0) + (count['INVOICE_VOID'] ?? 0)} hóa đơn bị hủy trong 24 giờ',
             if ((large.single['n'] as int) > 0)
               '${large.single['n']} điều chỉnh kho từ 50 đơn vị',
             if ((discounts.single['n'] as int) > 0)
@@ -355,6 +371,7 @@ class _AuditPageState extends State<AuditPage> {
                         width: 250,
                         child: DropdownButtonFormField<String>(
                           initialValue: action,
+                          isExpanded: true,
                           decoration: const InputDecoration(
                             labelText: 'Thao tác',
                           ),
@@ -379,6 +396,7 @@ class _AuditPageState extends State<AuditPage> {
                         width: 180,
                         child: DropdownButtonFormField<String>(
                           initialValue: severity,
+                          isExpanded: true,
                           decoration: const InputDecoration(
                             labelText: 'Mức độ',
                           ),

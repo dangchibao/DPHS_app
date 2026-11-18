@@ -1,6 +1,16 @@
-# Tiến độ kiểm chứng — 16/11/2026
+# Tiến độ kiểm chứng — cập nhật 17/11/2026
 
 Người dùng đã cho phép tiếp tục tự động giữa các phase. Đây là mốc tích hợp đang phát triển, chưa phải nghiệm thu toàn bộ yêu cầu và chưa dùng cho dữ liệu thật.
+
+## Trạng thái hiện tại — 0.7.0+7/schema 30
+
+Các nhóm nghiệp vụ trong yêu cầu đã có trong source và bản chạy thử: POS, kho/biến thể/size/barcode, PDF, combo, trường/lớp/học sinh, khuyến mãi/giá riêng, may riêng, đổi trả, cọc/công nợ, giữ hàng, chuyển kho, nhân viên/quyền/chấm công/lương, dashboard/báo cáo, đồng bộ, audit và sao lưu/khôi phục. Windows có bộ cài EXE và bản portable kèm CRT; Android có cả APK debug preview và APK ký release bằng khóa ngoài repo; Web/PWA staging online đã deploy.
+
+Cloudflare staging đã hoạt động, khóa Android release đã tạo và cần chủ sao lưu độc lập. Những việc còn lại để đưa vào vận hành là kích hoạt R2 có kiểm soát chi phí, thiết lập GitHub backup/secrets, nghiệm thu tải và thiết bị vật lý. Không tự push/deploy/thay production/bật phí theo AGENTS.md. Chưa có cơ sở cam kết hạn mức miễn phí đủ cho mọi tải hoặc nghiệm thu máy thật. Xem remaining-requested.md, preview-0.7.md và windows-installer.md để biết phạm vi hiện hành.
+
+## Cách đọc các mốc bên dưới
+
+Các phần bên dưới giữ lịch sử kiểm chứng từ các schema trước. Câu “chưa hoàn thiện” tại một mốc không phải danh sách tính năng còn thiếu của source hiện tại; mốc mới hơn ở cuối tài liệu thay thế trạng thái cũ. Đặc biệt, lương/Web/bàn giao/audit archive đã được bổ sung sau các bản 0.2–0.5. Không dùng số test của mốc cũ để mô tả lần chạy mới.
 
 ## Nền tảng local, quyền và kho
 
@@ -46,7 +56,7 @@ Source schema 15/16 có DT nhận lại/đổi hàng, giữ giá sau ưu đãi k
 
 Restore kiểm tra mật khẩu/checksum/danh tính, xác nhận hai lần và lý do; backup hiện trạng, giữ outbox/audit, từ chối nhánh audit hoặc hàng đợi cùng ID khác nội dung. Có journal phục hồi thao tác đổi file khi khởi động lại. Chặn nghiệp vụ đến khi kéo hết cloud và nâng counter. Chưa nghiệm thu mọi tình huống mất điện thật, backup cloud mã hóa, retention cloud hoặc cảnh báo tổng hợp toàn hệ thống.
 
-## Chức năng còn lại
+## Các việc còn lại tại mốc cũ (lịch sử)
 
 - Hoàn thiện bàn giao nhân viên giữa cửa hàng và phân bổ/chuyển tồn an toàn; đăng ký/duyệt/thu hồi máy và tạo chi nhánh đã có ở source 18.
 - Nghiệm thu tích hợp trường/học sinh/combo/ưu đãi trên thiết bị thật và D1.
@@ -101,3 +111,38 @@ Toàn bộ 157 test Flutter / 125 test API đạt; Flutter analyze, API typechec
 Build cuối Windows 0.5.0+5, Android APK 0.5.0/versionCode 5 và Web release đạt. EXE/version/schema 21 và APK chữ ký v2/quyền Internet/3 kiến trúc đã kiểm tra; APK ký debug. Web biên dịch được nhưng chưa có chức năng quản lý online hoàn chỉnh. Phạm vi đóng gói: preview-0.5.md; chưa nghiệm thu dữ liệu thật.
 
 Đã đóng ZIP/APK preview 0.5.0: 45 file ZIP xác minh theo manifest hash/length; EXE và migration 21 khớp bản build/source, APK đủ 3 kiến trúc; SHA256 hai gói khớp sidecar. Preview 0.4.0 cũ vẫn schema 18 và không bị thay đổi. Không có server thử hoặc Gradle daemon được chủ động giữ chạy sau kiểm chứng.
+
+## Mốc source schema 22 — lương và phiếu lương
+
+Cấu hình CAS, private outbox/feed, đối soát/checkpoint ngày, chốt/hủy/phát hành lại, khóa công, cờ giao dịch tới muộn, bảng lương toàn cửa hàng theo tháng và PDF A5 đã có. 166 test Flutter / 129 test API, analyze/typecheck/lint/Worker dry-run, D1 local migration 22 và build Windows release 0.6.0+6 đạt. Smoke HTTP workerd toàn luồng lương đạt; PDF đã kiểm tra trực quan một trang. Xem payroll.md. Chưa đóng gói source 0.6.0; ZIP/APK 0.5.0 vẫn schema 21. Không deploy cloud.
+
+## Mốc source schema 24–25 — báo cáo cloud và Web online
+
+Xem reports-cloud-web.md: 181 Flutter / 140 API đạt, build Windows/Web schema 25, workerd HTTP và Chrome release đăng ký/đăng nhập/dashboard/thu hồi phiên đạt. Hạn chế bộ test Chrome iframe được ghi rõ. Preview 0.5.0 vẫn schema 21. Pipeline backup cloud chuẩn bị, 7 test Python gồm GPG thực và restore SQL Wrangler local đạt; chưa chạy cloud/GitHub thật. Source hiện đã sang schema 26 cho QR chuyển khoản, đang kiểm chứng; chưa đóng gói lại.
+
+
+## Mốc schema 27–28 — ảnh, QR, hạn mức và bàn giao
+
+Schema 27: ảnh sản phẩm nén/cache SQLite, R2 tùy chọn, tài khoản/QR chuyển khoản, bảng cảnh báo hạn mức cloud. Windows/Web build schema 27 đạt; Worker HTTP D1/R2 local đạt. Schema 28: bàn giao quyền chờ máy drain queue, frozen interactive, current/issued RBAC, chốt nguyên tử và thu hồi grant. Toàn bộ 195 test Flutter/155 test API, analyze/typecheck/lint và 10 test backup Python đạt. HTTP workerd schema 28 đạt, gồm hóa đơn cũ gửi trong khi bàn giao và hai ACK thiết bị. Xem media-bank-usage.md và staff-handoff.md. Source schema 29 đang tích hợp; chưa đóng gói bản 0.6.0. Chưa chạy cloud thật.
+
+## Preview 0.6.0+6 — schema 29
+
+201 test Flutter, 163 test API và 10 test backup Python đạt; analyze/typecheck/lint/Worker dry-run đạt. Ngắt tiến trình thật trước/sau commit SQLite xác nhận mã 001/002, replay, kho, audit và outbox. Windows/Web/APK release build đạt; APK versionCode 6, v2, Internet và ba ABI đạt. Chrome release đã kiểm chứng enrollment/login/dashboard/catalog/lương online/audit desktop/mobile/revoke, không JS exception. Xem preview-0.6.md và store-settings-web-management.md. Source tiếp tục kho lưu trữ audit; không coi bản chạy thử là nghiệm thu hoàn tất hoặc cloud production.
+
+## Source 0.7.0+7 — schema 30
+
+Archive audit có file private/checkpoint/receipt/guard và tiếp tục chain/replay; importer cloud phục hồi bind dữ liệu lớn chỉ staging. Toàn bộ 204 test Flutter, 169 test API, 19 test Python đạt; workerd D1/R2 và Chrome release desktop/mobile/private-route revoke đạt. Windows/Web/APK 0.7 build cuối đạt. Windows ZIP 66 file/Web ZIP 75 file manifest khớp checksum; APK schema 30/versionCode 7/v2/Internet/ba ABI đạt. Process kill schema 30 đã kiểm chứng trọn lượt. Xem audit-archive-cloud-restore.md và preview-0.7.md. Còn setup/nghiệm thu cloud, GitHub, khóa ký và máy thật; không tự deploy/push/kích hoạt phí.
+
+Bổ sung bộ cài Windows per-user và CRT app-local: đã kiểm thử lifecycle cài/sửa/nâng/hạ/chặn khóa/gỡ giữ dữ liệu fixture. ZIP có 66 tệp manifest. Xem windows-installer.md; chưa ký Authenticode hoặc nghiệm thu Windows sạch.
+
+Lượt kiểm chứng hai file SQLite độc lập: 205 test Flutter đạt, analyze sạch; mất ACK/khởi động lại/replay/không vượt phân bổ đều đạt. Xem two-device-recovery.md. Chỉ đổi test/tài liệu; gói 0.7.0 không thay mã sản phẩm. Nghiệm thu phần cứng/cloud vẫn cần môi trường thật.
+
+Kiểm tra môi trường phát hành 17/11: Git remote đọc được, Wrangler báo chưa xác thực, cấu hình production local và bộ biến ký Android chưa có; adb trống. Xem ../operations/environment-status.md để biết thao tác đăng nhập cần chủ tài khoản thực hiện. Chỉ đọc, không deploy/push; không chạy lại test vì không đổi mã.
+
+Cập nhật sau đăng nhập Cloudflare: staging Web/Workers/D1 APAC schema 30 đã deploy, owner provision kiểm soát, 14 HTTP checks thực và restore D1→D1 84 bảng đạt; APK release mới ký bằng khóa ngoài repo đã build/verify. API 176 test đạt. Xem cloud-staging-release.md và ../operations/staging-access.md. R2 trả 10042/chưa bật, GitHub backup chưa kích hoạt, còn nghiệm thu thiết bị và sao lưu khóa do chủ giữ.
+
+Ngày 18/11 chốt hồ sơ Native→Cloudflare E2E: 2 hóa đơn/2 mã, 3 payments/700.000đ, ledger/cache 7, nợ 0, QA sessions 0 và endpoint QA tắt. Khóa GPG ngoài repo đã chuẩn bị, diễn tập private-export→keyring mới→giải mã/restore đạt; 23 test Python đạt. Xem native-cloud-e2e-backup-key.md. R2 còn 10042, workflow chưa có trên main public và chưa push theo AGENTS; sao lưu định kỳ chưa hoạt động.
+
+Hotfix Web 18/11 đã deploy: lưu/tự điền cặp ID sau đăng nhập trực tiếp, tương thích khóa cũ, không lưu token/mật khẩu/quyền; bỏ phản hồi login muộn khi đóng màn hình. 209 test Flutter/analyze đạt, Web build và Chrome/HTTPS đạt. Xem web-login-identity.md. Không migration/schema/native/API; R2/GitHub backup vẫn cần các điều kiện ngoài môi trường đã ghi.
+
+Ngày 18/11 rà soát lại readiness: remaining-requested.md là backlog hiện hành, các ghi chú schema cũ là lịch sử. R2 còn activation-required/10042 và workflow backup trên main còn 404. Không đổi code, không có lượt test/build/deploy mới trong lần cập nhật này.

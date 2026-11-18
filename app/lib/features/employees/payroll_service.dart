@@ -20,6 +20,20 @@ import 'payroll_calculation.dart';
 }
 
 extension PayrollService on LocalService {
+  Future<void> recordPayrollView({String? employee}) async {
+    require(Permission.payroll);
+    await db.transaction(
+      () => audit(
+        'PAYROLL_VIEW',
+        'report',
+        uuid.v7(),
+        reason: 'Xem dữ liệu lương',
+        severity: 'sensitive',
+        changes: {'employee_id': employee},
+      ),
+    );
+  }
+
   Future<List<Map<String, Object?>>> payrollPeriodTable(String month) {
     require(Permission.payroll);
     final (start, _) = payrollPeriod(month);

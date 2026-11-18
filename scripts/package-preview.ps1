@@ -16,6 +16,8 @@ $artifactsRoot = Join-Path $repoRoot 'artifacts\releases'
 $stagingRoot = Join-Path $artifactsRoot ('windows-' + [Guid]::NewGuid().ToString('N'))
 New-Item -ItemType Directory -Path $stagingRoot -Force | Out-Null
 Get-ChildItem -LiteralPath $releaseRoot | Copy-Item -Destination $stagingRoot -Recurse
+. (Join-Path $PSScriptRoot 'windows-runtime.ps1')
+Copy-WindowsRuntime -Destination $stagingRoot
 Copy-Item -LiteralPath (Join-Path $repoRoot 'docs\huong-dan-chay-thu.md') -Destination (Join-Path $stagingRoot 'HUONG-DAN.md')
 Copy-Item -LiteralPath (Join-Path $repoRoot 'docs\phases\progress.md') -Destination (Join-Path $stagingRoot 'TIEN-DO.md')
 $manifest = @(

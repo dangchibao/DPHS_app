@@ -10,7 +10,8 @@ import {
 } from "./security";
 import type { Permission, Role } from "./security";
 import type { Env } from "./index";
-import { auditStatement } from "./audit";
+import { auditStatement, clientAuditHead } from "./audit";
+import { staffChangeGate, staffFreezeCondition } from "./staff_handoffs";
 
 export interface Actor {
   user_id: string;
@@ -21,6 +22,8 @@ export interface Actor {
   session_id: string;
   issued_role?: Role;
   session_kind?: string;
+  device_kind?: string;
+  frozen?: number;
 }
 
 export async function authenticate(
@@ -33,7 +36,7 @@ export async function authenticate(
   if (!token || token.length !== 64)
     throw new ApiError(401, "Vui lòng đăng nhập.", "UNAUTHENTICATED");
   const actor = await env.DB.prepare(
-    `SELECT s.id AS session_id,s.user_id,s.store_id,s.device_id,a.role,u.display_name AS name,s.kind AS session_kind,s.issued_role
+    `SELECT s.id AS session_id,s.user_id,s.store_id,s.device_id,a.role,u.display_name AS name,s.kind AS session_kind,s.issued_role,d.kind AS device_kind,${staffFreezeCondition("s.user_id", "s.store_id")} AS frozen
     FROM sessions s JOIN users u ON u.id=s.user_id JOIN employee_store_assignments a ON a.user_id=s.user_id AND a.store_id=s.store_id
     JOIN devices d ON d.id=s.device_id AND d.store_id=s.store_id JOIN stores st ON st.id=s.store_id
     WHERE s.token_hash=? AND s.revoked=0 AND s.expires_at>? AND u.active=1 AND a.active=1 AND d.status='approved' AND st.active=1 AND s.installation_hash=d.installation_hash`,
@@ -53,6 +56,57 @@ export async function authenticate(
       "TOKEN_SCOPE",
     );
   if (permission) checkPermission(actor.role, permission, actor.issued_role);
+  if (actor.frozen) {
+    const url = new URL(request.url),
+      path = url.pathname;
+    const drain =
+      (purpose === "sync" &&
+        ["/sync/push", "/payroll/push", "/staff/handoffs/ack"].includes(
+          path,
+        )) ||
+      (actor.session_kind === "interactive" &&
+        (path === "/directory" ||
+          path === "/auth/logout" ||
+          (path === "/sync/pull" &&
+            ["global", "store"].includes(
+              url.searchParams.get("scope") ?? "store",
+            ))));
+    if (!drain)
+      throw new ApiError(
+        401,
+        "Tài khoản đang bàn giao; chỉ đồng bộ giao dịch cũ.",
+        "STAFF_HANDOFF_PENDING",
+      );
+  }
+  if (actor.device_kind === "web") {
+    const path = new URL(request.url).pathname;
+    const allowed = [
+      "/auth/me",
+      "/auth/logout",
+      "/auth/password",
+      "/management",
+      "/staff",
+      "/staff/handoffs",
+      "/payroll/pull",
+      "/payroll/preview",
+      "/web/payroll",
+      "/web/catalog",
+      "/usage",
+      "/audit/read",
+      "/audit/options",
+    ];
+    if (
+      purpose === "sync" ||
+      (!allowed.includes(path) &&
+        !path.startsWith("/reports/") &&
+        !path.startsWith("/audit/archives"))
+    )
+      throw new ApiError(
+        403,
+        "Trình duyệt chỉ quản lý online; không được bán hoặc đồng bộ giao dịch offline.",
+        "WEB_SCOPE",
+      );
+  }
   return actor;
 }
 
@@ -119,6 +173,7 @@ export async function login(
   env: Env,
   body: Record<string, unknown>,
   request: Request,
+  web = false,
 ): Promise<Response> {
   const username = text(body.username, "Tài khoản", 80),
     proof = credential(body.credential);
@@ -146,9 +201,9 @@ export async function login(
     );
   const user = await env.DB.prepare(
     `SELECT u.*,a.role FROM users u JOIN employee_store_assignments a ON a.user_id=u.id
-    JOIN devices d ON d.store_id=a.store_id WHERE u.username=? AND u.active=1 AND a.store_id=? AND a.active=1 AND d.id=? AND d.status='approved'`,
+    JOIN devices d ON d.store_id=a.store_id WHERE u.username=? AND u.active=1 AND a.store_id=? AND a.active=1 AND d.id=? AND d.status='approved' AND d.kind=?`,
   )
-    .bind(username, storeId, deviceId)
+    .bind(username, storeId, deviceId, web ? "web" : "native")
     .first<{
       id: string;
       password_hash: string;
@@ -206,9 +261,23 @@ export async function login(
       "INVALID_CREDENTIALS",
     );
   }
+  if (
+    await env.DB.prepare(
+      `SELECT 1 FROM employee_store_assignments a WHERE a.user_id=? AND a.store_id=? AND ${staffFreezeCondition("a.user_id", "a.store_id")}`,
+    )
+      .bind(user.id, storeId)
+      .first()
+  )
+    throw new ApiError(
+      403,
+      "Tài khoản đang bàn giao. Cần đồng bộ hàng đợi cũ trên các máy trước; quản lý có thể hủy bàn giao để xác thực lại.",
+      "STAFF_HANDOFF_PENDING",
+    );
   const token = randomToken(),
     syncToken = randomToken(),
-    expiresAt = new Date(now + 7 * 86400000).toISOString();
+    expiresAt = new Date(
+      now + (web ? 8 * 3600000 : 7 * 86400000),
+    ).toISOString();
   const installation =
     typeof body.installation_id === "string"
       ? text(body.installation_id, "Mã cài đặt")
@@ -238,20 +307,24 @@ export async function login(
       "interactive",
       user.role,
     ),
-    env.DB.prepare(
-      "INSERT INTO sessions(id,store_id,user_id,device_id,token_hash,created_at,expires_at,revoked,installation_hash,kind,issued_role) VALUES (?,?,?,?,?,?,?,0,?,?,?)",
-    ).bind(
-      crypto.randomUUID(),
-      storeId,
-      user.id,
-      deviceId,
-      await sha256(syncToken),
-      new Date(now).toISOString(),
-      expiresAt,
-      installationHash,
-      "sync",
-      user.role,
-    ),
+    ...(!web
+      ? [
+          env.DB.prepare(
+            "INSERT INTO sessions(id,store_id,user_id,device_id,token_hash,created_at,expires_at,revoked,installation_hash,kind,issued_role) VALUES (?,?,?,?,?,?,?,0,?,?,?)",
+          ).bind(
+            crypto.randomUUID(),
+            storeId,
+            user.id,
+            deviceId,
+            await sha256(syncToken),
+            new Date(now).toISOString(),
+            expiresAt,
+            installationHash,
+            "sync",
+            user.role,
+          ),
+        ]
+      : []),
     env.DB.prepare("DELETE FROM auth_attempts WHERE key=?").bind(key),
     await auditStatement(
       env.DB,
@@ -268,7 +341,12 @@ export async function login(
   ]);
   return Response.json({
     token,
-    sync_token: syncToken,
+    ...(web
+      ? {}
+      : {
+          sync_token: syncToken,
+          audit_head: await clientAuditHead(env.DB, storeId, deviceId),
+        }),
     expires_at: expiresAt,
     user: {
       id: user.id,
@@ -334,6 +412,8 @@ export async function staff(
   body?: Record<string, unknown>,
 ): Promise<Response> {
   checkPermission(actor.role, "staff", actor.issued_role);
+  const owner =
+    actor.role === "owner" && (actor.issued_role ?? actor.role) === "owner";
   if (!body) {
     const users = await env.DB.prepare(
       `SELECT u.id,u.username,u.display_name,(u.active AND a.active) AS active,a.role,a.store_id FROM users u
@@ -351,12 +431,12 @@ export async function staff(
     throw new ApiError(400, "Vai trò không hợp lệ.");
   const id = typeof body.id === "string" ? body.id : crypto.randomUUID();
   const target = await env.DB.prepare(
-    "SELECT role FROM employee_store_assignments WHERE store_id=? AND user_id=?",
+    "SELECT role,active FROM employee_store_assignments WHERE store_id=? AND user_id=?",
   )
     .bind(actor.store_id, id)
-    .first<{ role: Role }>();
+    .first<{ role: Role; active: number }>();
   if (
-    actor.role !== "owner" &&
+    !owner &&
     (role === "owner" ||
       role === "manager" ||
       target?.role === "owner" ||
@@ -373,10 +453,26 @@ export async function staff(
     active = body.active === false ? 0 : 1,
     name = text(body.display_name, "Tên nhân viên"),
     username = text(body.username, "Tài khoản", 80);
-  const existing = await env.DB.prepare("SELECT id FROM users WHERE id=?")
+  const existing = await env.DB.prepare(
+    "SELECT id,active FROM users WHERE id=?",
+  )
     .bind(id)
-    .first();
+    .first<{ id: string; active: number }>();
   const statements: D1PreparedStatement[] = [];
+  let requestId: string | undefined;
+  if (existing) {
+    const gate = await staffChangeGate(env, actor, {
+      ...body,
+      id,
+      role,
+      active: active === 1,
+      username,
+      display_name: name,
+    });
+    if (gate.response) return gate.response;
+    statements.push(...(gate.statements ?? []));
+    requestId = gate.requestId;
+  }
   if (!existing) {
     const salt = credential(body.salt);
     statements.push(
@@ -392,12 +488,12 @@ export async function staff(
       ),
     );
   } else {
-    if (!target && actor.role !== "owner")
+    if (!target && !owner)
       throw new ApiError(403, "Nhân viên thuộc cửa hàng khác.");
     statements.push(
       env.DB.prepare(
         "UPDATE users SET display_name=?,active=CASE WHEN ?='owner' THEN ? ELSE active END,updated_at=? WHERE id=?",
-      ).bind(name, actor.role, active, now, id),
+      ).bind(name, owner ? "owner" : "manager", active, now, id),
     );
   }
   statements.push(
@@ -406,7 +502,19 @@ export async function staff(
     ).bind(crypto.randomUUID(), actor.store_id, id, role, active, now),
   );
   statements.push(
-    env.DB.prepare("UPDATE sessions SET revoked=1 WHERE user_id=?").bind(id),
+    env.DB.prepare(
+      "UPDATE sessions SET revoked=1 WHERE user_id=? AND ?=1 AND(?=1 OR store_id=?)",
+    ).bind(
+      id,
+      !existing ||
+        target?.role !== role ||
+        target?.active !== active ||
+        (owner && existing.active !== active)
+        ? 1
+        : 0,
+      owner && existing?.active !== active ? 1 : 0,
+      actor.store_id,
+    ),
   );
   statements.push(
     await auditStatement(
@@ -415,7 +523,7 @@ export async function staff(
       existing ? "STAFF_UPDATE" : "STAFF_CREATE",
       id,
       text(body.reason, "Lý do"),
-      { role, active, display_name: name },
+      { role, active, display_name: name, request_id: requestId ?? null },
     ),
   );
   await env.DB.batch(statements);

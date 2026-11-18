@@ -1,3 +1,5 @@
+import '../audit/cloud_audit_page.dart';
+
 import 'package:material_ui/material_ui.dart';
 import 'package:intl/intl.dart';
 
@@ -24,6 +26,12 @@ import '../sizes/sizes_page.dart';
 import '../transfers/transfers_page.dart';
 import '../employees/attendance_page.dart';
 import '../employees/payroll_page.dart';
+import '../reports/reports_page.dart';
+import '../reports/online_reports_page.dart';
+import '../../core/export/report_export.dart';
+import '../settings/bank_account_page.dart';
+import '../../core/media/product_image.dart';
+import '../settings/cloud_usage_page.dart';
 
 final vnd = NumberFormat.currency(
   locale: 'vi_VN',
@@ -281,6 +289,56 @@ class _WorkspaceState extends State<Workspace> {
               const SizedBox(width: 16),
               PopupMenuButton<String>(
                 onSelected: (value) {
+                  if (value == 'cloud_reports') {
+                    final engine = widget.service.syncEngine;
+                    if (engine == null) {
+                      message('Cần cấu hình và đăng nhập cloud.');
+                      return;
+                    }
+                    Navigator.of(context).push(
+                      MaterialPageRoute<void>(
+                        builder: (_) => Scaffold(
+                          appBar: AppBar(title: const Text('Báo cáo online')),
+                          body: OnlineReportsPage(
+                            api: engine.api,
+                            storeId: widget.service.storeId,
+                            clock: widget.service.clock,
+                            exportAction: (name, table, pdf) async {
+                              widget.service.require(Permission.reports);
+                              if (pdf) {
+                                await saveReportPdf(
+                                  widget.service,
+                                  name,
+                                  table.headers,
+                                  table.pdfRows(),
+                                );
+                              } else {
+                                await saveReportXlsx(
+                                  widget.service,
+                                  name,
+                                  table.headers,
+                                  table.excelRows(),
+                                  moneyColumns: table.moneyColumns,
+                                );
+                              }
+                            },
+                          ),
+                        ),
+                      ),
+                    );
+                  }
+                  if (value == 'reports') {
+                    Navigator.of(context).push(
+                      MaterialPageRoute<void>(
+                        builder: (_) => Scaffold(
+                          appBar: AppBar(
+                            title: const Text('Dashboard · báo cáo'),
+                          ),
+                          body: ReportsPage(service: widget.service),
+                        ),
+                      ),
+                    );
+                  }
                   if (value == 'payroll') {
                     Navigator.of(context).push(
                       MaterialPageRoute<void>(
@@ -331,6 +389,33 @@ class _WorkspaceState extends State<Workspace> {
                             title: const Text('Quản trị hệ thống'),
                           ),
                           body: ManagementPage(service: widget.service),
+                        ),
+                      ),
+                    );
+                  }
+                  if (value == 'bank_account') {
+                    Navigator.of(context).push(
+                      MaterialPageRoute<void>(
+                        builder: (_) => Scaffold(
+                          appBar: AppBar(title: const Text('QR chuyển khoản')),
+                          body: BankAccountPage(service: widget.service),
+                        ),
+                      ),
+                    );
+                  }
+                  if (value == 'cloud_usage') {
+                    final api = widget.service.syncEngine?.api;
+                    if (api == null) {
+                      message(
+                        StateError('Cần đăng nhập cloud để xem hạn mức.'),
+                      );
+                      return;
+                    }
+                    Navigator.of(context).push(
+                      MaterialPageRoute<void>(
+                        builder: (_) => Scaffold(
+                          appBar: AppBar(title: const Text('Hạn mức cloud')),
+                          body: CloudUsagePage(api: api),
                         ),
                       ),
                     );
@@ -446,6 +531,29 @@ class _WorkspaceState extends State<Workspace> {
                       ),
                     );
                   }
+                  if (value == 'audit_cloud') {
+                    final api = widget.service.syncEngine?.api;
+                    if (api == null) {
+                      message(
+                        StateError('Cần đăng nhập cloud để xem nhật ký.'),
+                      );
+                      return;
+                    }
+                    Navigator.of(context).push(
+                      MaterialPageRoute<void>(
+                        builder: (_) => Scaffold(
+                          appBar: AppBar(title: const Text('Nhật ký cloud')),
+                          body: CloudAuditPage(
+                            api: api,
+                            storeId: widget.service.storeId,
+                            canArchive: widget.service.session!.can(
+                              Permission.configure,
+                            ),
+                          ),
+                        ),
+                      ),
+                    );
+                  }
                   if (value == 'audit') {
                     Navigator.of(context).push(
                       MaterialPageRoute<void>(
@@ -458,6 +566,16 @@ class _WorkspaceState extends State<Workspace> {
                   }
                 },
                 itemBuilder: (_) => [
+                  if (widget.service.session!.can(Permission.reports))
+                    const PopupMenuItem(
+                      value: 'cloud_reports',
+                      child: Text('Báo cáo cloud · nhiều cửa hàng'),
+                    ),
+                  if (widget.service.session!.can(Permission.reports))
+                    const PopupMenuItem(
+                      value: 'reports',
+                      child: Text('Dashboard · báo cáo'),
+                    ),
                   if (widget.service.session!.can(Permission.payroll))
                     const PopupMenuItem(
                       value: 'payroll',
@@ -482,6 +600,16 @@ class _WorkspaceState extends State<Workspace> {
                     const PopupMenuItem(
                       value: 'management',
                       child: Text('Cửa hàng · thiết bị'),
+                    ),
+                  if (widget.service.session!.can(Permission.configure))
+                    const PopupMenuItem(
+                      value: 'bank_account',
+                      child: Text('Tài khoản · QR chuyển khoản'),
+                    ),
+                  if (widget.service.session!.can(Permission.configure))
+                    const PopupMenuItem(
+                      value: 'cloud_usage',
+                      child: Text('Hạn mức cloud'),
                     ),
                   if (widget.service.session!.can(Permission.reserve))
                     const PopupMenuItem(
@@ -538,6 +666,12 @@ class _WorkspaceState extends State<Workspace> {
                       value: 'backup',
                       child: Text('Sao lưu & khôi phục'),
                     ),
+                  if (permissionsByRole[role]!.contains(Permission.audit) &&
+                      widget.service.syncEngine != null)
+                    const PopupMenuItem(
+                      value: 'audit_cloud',
+                      child: Text('Nhật ký cloud · cửa hàng'),
+                    ),
                   if (permissionsByRole[role]!.contains(Permission.audit))
                     const PopupMenuItem(
                       value: 'audit',
@@ -582,341 +716,389 @@ class _WorkspaceState extends State<Workspace> {
                 ),
             ],
           ),
-          body: Row(
+          body: Column(
             children: [
-              if (wide)
-                NavigationRail(
-                  extended: true,
-                  selectedIndex: page,
-                  onDestinationSelected: (v) => setState(() => page = v),
-                  destinations: [
-                    const NavigationRailDestination(
-                      icon: Icon(Icons.grid_view),
-                      label: Text('Sản phẩm'),
-                    ),
-                    const NavigationRailDestination(
-                      icon: Icon(Icons.inventory_2_outlined),
-                      label: Text('Tồn kho'),
-                    ),
-                    if (canSell)
-                      const NavigationRailDestination(
-                        icon: Icon(Icons.point_of_sale),
-                        label: Text('Bán hàng'),
-                      ),
-                    if (canSell)
-                      const NavigationRailDestination(
-                        icon: Icon(Icons.receipt_long),
-                        label: Text('Hóa đơn'),
-                      ),
-                    if (canStaff)
-                      const NavigationRailDestination(
-                        icon: Icon(Icons.people_outline),
-                        label: Text('Nhân viên'),
-                      ),
-                  ],
+              if (widget.service.session!.can(Permission.configure) &&
+                  widget.service.syncEngine != null)
+                CloudUsagePage(
+                  api: widget.service.syncEngine!.api,
+                  compact: true,
                 ),
               Expanded(
-                child: page == 2 && canSell
-                    ? PosPage(service: widget.service)
-                    : page == 3 && canSell
-                    ? InvoicesPage(service: widget.service)
-                    : page == 4
-                    ? EmployeesPage(service: widget.service)
-                    : Padding(
-                        padding: EdgeInsets.all(wide ? 28 : 16),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Wrap(
-                              alignment: WrapAlignment.spaceBetween,
-                              spacing: 20,
-                              runSpacing: 16,
-                              children: [
-                                Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      page == 0
-                                          ? 'Danh mục sản phẩm'
-                                          : 'Kho hàng chi nhánh',
-                                      style: const TextStyle(
-                                        fontSize: 28,
-                                        fontWeight: FontWeight.w800,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 6),
-                                    Text(
-                                      page == 0
-                                          ? 'Đồng phục cho từng mùa, từng năm học'
-                                          : 'Mọi thay đổi đều được ghi vào sổ cái kho',
-                                      style: const TextStyle(
-                                        color: Color(0xff64748b),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                if (canCatalog && page == 0)
-                                  FilledButton.icon(
-                                    onPressed: addProduct,
-                                    icon: const Icon(Icons.add),
-                                    label: const Text('Thêm sản phẩm'),
-                                  ),
-                              ],
+                child: Row(
+                  children: [
+                    if (wide)
+                      NavigationRail(
+                        extended: true,
+                        selectedIndex: page,
+                        onDestinationSelected: (v) => setState(() => page = v),
+                        destinations: [
+                          const NavigationRailDestination(
+                            icon: Icon(Icons.grid_view),
+                            label: Text('Sản phẩm'),
+                          ),
+                          const NavigationRailDestination(
+                            icon: Icon(Icons.inventory_2_outlined),
+                            label: Text('Tồn kho'),
+                          ),
+                          if (canSell)
+                            const NavigationRailDestination(
+                              icon: Icon(Icons.point_of_sale),
+                              label: Text('Bán hàng'),
                             ),
-                            const SizedBox(height: 24),
-                            TextField(
-                              controller: searchController,
-                              onChanged: (value) {
-                                search = value;
-                                refresh();
-                              },
-                              decoration: InputDecoration(
-                                hintText:
-                                    'Tìm tên, mã sản phẩm hoặc quét mã vạch…',
-                                prefixIcon: const Icon(Icons.search),
-                                suffixIcon: IconButton(
-                                  onPressed: refresh,
-                                  icon: const Icon(Icons.refresh),
-                                ),
-                              ),
+                          if (canSell)
+                            const NavigationRailDestination(
+                              icon: Icon(Icons.receipt_long),
+                              label: Text('Hóa đơn'),
                             ),
-                            const SizedBox(height: 20),
-                            if (loading) const LinearProgressIndicator(),
-                            if (error != null)
-                              Text(
-                                error!,
-                                style: const TextStyle(color: Colors.red),
-                              ),
-                            Expanded(
-                              child: products.isEmpty && !loading
-                                  ? const Center(
-                                      child: Text('Chưa có sản phẩm phù hợp.'),
-                                    )
-                                  : page == 1
-                                  ? SingleChildScrollView(
-                                      scrollDirection: Axis.horizontal,
-                                      child: SingleChildScrollView(
-                                        child: DataTable(
-                                          columns: [
-                                            for (final title in [
-                                              'Sản phẩm',
-                                              'Size',
-                                              'Màu',
-                                              'Mã vạch',
-                                              'Tồn thực',
-                                              'Cảnh báo',
-                                              'Thao tác',
-                                            ])
-                                              DataColumn(label: Text(title)),
-                                          ],
-                                          rows: [
-                                            for (final product in products)
-                                              DataRow(
-                                                cells: [
-                                                  DataCell(
-                                                    Text(
-                                                      product['name'] as String,
-                                                    ),
-                                                  ),
-                                                  DataCell(
-                                                    Text(
-                                                      product['size'] as String,
-                                                    ),
-                                                  ),
-                                                  DataCell(
-                                                    Text(
-                                                      product['color']
-                                                          as String,
-                                                    ),
-                                                  ),
-                                                  DataCell(
-                                                    Text(
-                                                      product['barcode']
-                                                              as String? ??
-                                                          '',
-                                                    ),
-                                                  ),
-                                                  DataCell(
-                                                    Text('${product['stock']}'),
-                                                  ),
-                                                  DataCell(
-                                                    Text(
-                                                      (product['stock']
-                                                                  as int) <=
-                                                              (product['threshold']
-                                                                  as int)
-                                                          ? 'Sắp hết'
-                                                          : 'Đủ hàng',
-                                                    ),
-                                                  ),
-                                                  DataCell(
-                                                    canStock
-                                                        ? TextButton(
-                                                            onPressed: () =>
-                                                                adjust(product),
-                                                            child: const Text(
-                                                              'Nhập / điều chỉnh',
-                                                            ),
-                                                          )
-                                                        : const Text('—'),
-                                                  ),
-                                                ],
-                                              ),
-                                          ],
-                                        ),
-                                      ),
-                                    )
-                                  : GridView.builder(
-                                      gridDelegate:
-                                          SliverGridDelegateWithMaxCrossAxisExtent(
-                                            maxCrossAxisExtent: 270,
-                                            mainAxisExtent: 262,
-                                            crossAxisSpacing: 16,
-                                            mainAxisSpacing: 16,
-                                          ),
-                                      itemCount: products.length,
-                                      itemBuilder: (context, index) {
-                                        final product = products[index];
-                                        return Card(
-                                          elevation: 0,
-                                          color: Colors.white,
-                                          clipBehavior: Clip.antiAlias,
-                                          child: Padding(
-                                            padding: const EdgeInsets.all(16),
-                                            child: Column(
-                                              crossAxisAlignment:
-                                                  CrossAxisAlignment.start,
-                                              children: [
-                                                if (canCatalog)
-                                                  Align(
-                                                    alignment:
-                                                        Alignment.centerRight,
-                                                    child:
-                                                        PopupMenuButton<String>(
-                                                          onSelected: (action) {
-                                                            if (action ==
-                                                                'edit') {
-                                                              editVariant(
-                                                                product,
-                                                              );
-                                                            }
-                                                            if (action ==
-                                                                'variant') {
-                                                              editVariant(
-                                                                product,
-                                                                true,
-                                                              );
-                                                            }
-                                                            if (action ==
-                                                                'archive') {
-                                                              archive(product);
-                                                            }
-                                                          },
-                                                          itemBuilder: (_) =>
-                                                              const [
-                                                                PopupMenuItem(
-                                                                  value: 'edit',
-                                                                  child: Text(
-                                                                    'Chỉnh sửa',
-                                                                  ),
-                                                                ),
-                                                                PopupMenuItem(
-                                                                  value:
-                                                                      'variant',
-                                                                  child: Text(
-                                                                    'Thêm size / màu',
-                                                                  ),
-                                                                ),
-                                                                PopupMenuItem(
-                                                                  value:
-                                                                      'archive',
-                                                                  child: Text(
-                                                                    'Ngừng bán',
-                                                                  ),
-                                                                ),
-                                                              ],
-                                                        ),
-                                                  ),
-                                                Expanded(
-                                                  child: Container(
-                                                    width: double.infinity,
-                                                    decoration: BoxDecoration(
-                                                      color: const Color(
-                                                        0xffedf4ff,
-                                                      ),
-                                                      borderRadius:
-                                                          BorderRadius.circular(
-                                                            12,
-                                                          ),
-                                                    ),
-                                                    child: Icon(
-                                                      product['category'] ==
-                                                              'Mũ'
-                                                          ? Icons
-                                                                .sports_baseball
-                                                          : product['category'] ==
-                                                                'Giày'
-                                                          ? Icons.sports_soccer
-                                                          : Icons.checkroom,
-                                                      size: 52,
-                                                      color: const Color(
-                                                        0xff6c95cb,
-                                                      ),
-                                                    ),
-                                                  ),
-                                                ),
-                                                const SizedBox(height: 12),
-                                                Text(
-                                                  product['name'] as String,
-                                                  maxLines: 1,
-                                                  overflow:
-                                                      TextOverflow.ellipsis,
-                                                  style: const TextStyle(
-                                                    fontWeight: FontWeight.w700,
-                                                    fontSize: 16,
-                                                  ),
-                                                ),
-                                                const SizedBox(height: 4),
-                                                Text(
-                                                  'Size ${product['size']} · ${product['color']}',
-                                                  style: const TextStyle(
-                                                    color: Color(0xff64748b),
-                                                  ),
-                                                ),
-                                                const SizedBox(height: 10),
-                                                Row(
-                                                  mainAxisAlignment:
-                                                      MainAxisAlignment
-                                                          .spaceBetween,
-                                                  children: [
-                                                    Text(
-                                                      vnd.format(
-                                                        product['sale_price'],
-                                                      ),
-                                                      style: const TextStyle(
-                                                        color: Color(
-                                                          0xff1763c0,
-                                                        ),
-                                                        fontWeight:
-                                                            FontWeight.w800,
-                                                        fontSize: 17,
-                                                      ),
-                                                    ),
-                                                    Text(
-                                                      'Còn ${product['stock']}',
-                                                    ),
-                                                  ],
-                                                ),
-                                              ],
+                          if (canStaff)
+                            const NavigationRailDestination(
+                              icon: Icon(Icons.people_outline),
+                              label: Text('Nhân viên'),
+                            ),
+                        ],
+                      ),
+                    Expanded(
+                      child: page == 2 && canSell
+                          ? PosPage(service: widget.service)
+                          : page == 3 && canSell
+                          ? InvoicesPage(service: widget.service)
+                          : page == 4
+                          ? EmployeesPage(service: widget.service)
+                          : Padding(
+                              padding: EdgeInsets.all(wide ? 28 : 16),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Wrap(
+                                    alignment: WrapAlignment.spaceBetween,
+                                    spacing: 20,
+                                    runSpacing: 16,
+                                    children: [
+                                      Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            page == 0
+                                                ? 'Danh mục sản phẩm'
+                                                : 'Kho hàng chi nhánh',
+                                            style: const TextStyle(
+                                              fontSize: 28,
+                                              fontWeight: FontWeight.w800,
                                             ),
                                           ),
-                                        );
-                                      },
+                                          const SizedBox(height: 6),
+                                          Text(
+                                            page == 0
+                                                ? 'Đồng phục cho từng mùa, từng năm học'
+                                                : 'Mọi thay đổi đều được ghi vào sổ cái kho',
+                                            style: const TextStyle(
+                                              color: Color(0xff64748b),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      if (canCatalog && page == 0)
+                                        FilledButton.icon(
+                                          onPressed: addProduct,
+                                          icon: const Icon(Icons.add),
+                                          label: const Text('Thêm sản phẩm'),
+                                        ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 24),
+                                  TextField(
+                                    controller: searchController,
+                                    onChanged: (value) {
+                                      search = value;
+                                      refresh();
+                                    },
+                                    decoration: InputDecoration(
+                                      hintText: 'Tìm tên, mã sản phẩm hoặc quét mã vạch…',
+                                      prefixIcon: const Icon(Icons.search),
+                                      suffixIcon: IconButton(
+                                        onPressed: refresh,
+                                        icon: const Icon(Icons.refresh),
+                                      ),
                                     ),
+                                  ),
+                                  const SizedBox(height: 20),
+                                  if (loading) const LinearProgressIndicator(),
+                                  if (error != null)
+                                    Text(
+                                      error!,
+                                      style: const TextStyle(color: Colors.red),
+                                    ),
+                                  Expanded(
+                                    child: products.isEmpty && !loading
+                                        ? const Center(
+                                            child: Text(
+                                              'Chưa có sản phẩm phù hợp.',
+                                            ),
+                                          )
+                                        : page == 1
+                                        ? SingleChildScrollView(
+                                            scrollDirection: Axis.horizontal,
+                                            child: SingleChildScrollView(
+                                              child: DataTable(
+                                                columns: [
+                                                  for (final title in [
+                                                    'Sản phẩm',
+                                                    'Size',
+                                                    'Màu',
+                                                    'Mã vạch',
+                                                    'Tồn thực',
+                                                    'Cảnh báo',
+                                                    'Thao tác',
+                                                  ])
+                                                    DataColumn(
+                                                      label: Text(title),
+                                                    ),
+                                                ],
+                                                rows: [
+                                                  for (final product
+                                                      in products)
+                                                    DataRow(
+                                                      cells: [
+                                                        DataCell(
+                                                          Text(
+                                                            product['name']
+                                                                as String,
+                                                          ),
+                                                        ),
+                                                        DataCell(
+                                                          Text(
+                                                            product['size']
+                                                                as String,
+                                                          ),
+                                                        ),
+                                                        DataCell(
+                                                          Text(
+                                                            product['color']
+                                                                as String,
+                                                          ),
+                                                        ),
+                                                        DataCell(
+                                                          Text(
+                                                            product['barcode']
+                                                                    as String? ??
+                                                                '',
+                                                          ),
+                                                        ),
+                                                        DataCell(
+                                                          Text(
+                                                            '${product['stock']}',
+                                                          ),
+                                                        ),
+                                                        DataCell(
+                                                          Text(
+                                                            (product['stock']
+                                                                        as int) <=
+                                                                    (product['threshold']
+                                                                        as int)
+                                                                ? 'Sắp hết'
+                                                                : 'Đủ hàng',
+                                                          ),
+                                                        ),
+                                                        DataCell(
+                                                          canStock
+                                                              ? TextButton(
+                                                                  onPressed: () =>
+                                                                      adjust(
+                                                                        product,
+                                                                      ),
+                                                                  child:
+                                                                      const Text(
+                                                                        'Nhập / điều chỉnh',
+                                                                      ),
+                                                                )
+                                                              : const Text('—'),
+                                                        ),
+                                                      ],
+                                                    ),
+                                                ],
+                                              ),
+                                            ),
+                                          )
+                                        : GridView.builder(
+                                            gridDelegate:
+                                                SliverGridDelegateWithMaxCrossAxisExtent(
+                                                  maxCrossAxisExtent: 270,
+                                                  mainAxisExtent: 262,
+                                                  crossAxisSpacing: 16,
+                                                  mainAxisSpacing: 16,
+                                                ),
+                                            itemCount: products.length,
+                                            itemBuilder: (context, index) {
+                                              final product = products[index];
+                                              return Card(
+                                                elevation: 0,
+                                                color: Colors.white,
+                                                clipBehavior: Clip.antiAlias,
+                                                child: Padding(
+                                                  padding: const EdgeInsets.all(
+                                                    16,
+                                                  ),
+                                                  child: Column(
+                                                    crossAxisAlignment:
+                                                        CrossAxisAlignment
+                                                            .start,
+                                                    children: [
+                                                      if (canCatalog)
+                                                        Align(
+                                                          alignment: Alignment
+                                                              .centerRight,
+                                                          child: PopupMenuButton<String>(
+                                                            onSelected: (action) {
+                                                              if (action ==
+                                                                  'edit') {
+                                                                editVariant(
+                                                                  product,
+                                                                );
+                                                              }
+                                                              if (action ==
+                                                                  'variant') {
+                                                                editVariant(
+                                                                  product,
+                                                                  true,
+                                                                );
+                                                              }
+                                                              if (action ==
+                                                                  'archive') {
+                                                                archive(
+                                                                  product,
+                                                                );
+                                                              }
+                                                            },
+                                                            itemBuilder:
+                                                                (_) => const [
+                                                                  PopupMenuItem(
+                                                                    value:
+                                                                        'edit',
+                                                                    child: Text(
+                                                                      'Chỉnh sửa',
+                                                                    ),
+                                                                  ),
+                                                                  PopupMenuItem(
+                                                                    value: 'variant',
+                                                                    child: Text(
+                                                                      'Thêm size / màu',
+                                                                    ),
+                                                                  ),
+                                                                  PopupMenuItem(
+                                                                    value: 'archive',
+                                                                    child: Text(
+                                                                      'Ngừng bán',
+                                                                    ),
+                                                                  ),
+                                                                ],
+                                                          ),
+                                                        ),
+                                                      Expanded(
+                                                        child: Container(
+                                                          width:
+                                                              double.infinity,
+                                                          decoration: BoxDecoration(
+                                                            color: const Color(
+                                                              0xffedf4ff,
+                                                            ),
+                                                            borderRadius:
+                                                                BorderRadius.circular(
+                                                                  12,
+                                                                ),
+                                                          ),
+                                                          child: ProductImage(
+                                                            service:
+                                                                widget.service,
+                                                            reference:
+                                                                product['image_path']
+                                                                    as String?,
+                                                            fallback: Icon(
+                                                              product['category'] ==
+                                                                      'Mũ'
+                                                                  ? Icons
+                                                                        .sports_baseball
+                                                                  : product['category'] ==
+                                                                        'Giày'
+                                                                  ? Icons
+                                                                        .sports_soccer
+                                                                  : Icons
+                                                                        .checkroom,
+                                                              size: 52,
+                                                              color:
+                                                                  const Color(
+                                                                    0xff6c95cb,
+                                                                  ),
+                                                            ),
+                                                          ),
+                                                        ),
+                                                      ),
+                                                      const SizedBox(
+                                                        height: 12,
+                                                      ),
+                                                      Text(
+                                                        product['name']
+                                                            as String,
+                                                        maxLines: 1,
+                                                        overflow: TextOverflow
+                                                            .ellipsis,
+                                                        style: const TextStyle(
+                                                          fontWeight:
+                                                              FontWeight.w700,
+                                                          fontSize: 16,
+                                                        ),
+                                                      ),
+                                                      const SizedBox(height: 4),
+                                                      Text(
+                                                        'Size ${product['size']} · ${product['color']}',
+                                                        style: const TextStyle(
+                                                          color: Color(
+                                                            0xff64748b,
+                                                          ),
+                                                        ),
+                                                      ),
+                                                      const SizedBox(
+                                                        height: 10,
+                                                      ),
+                                                      Row(
+                                                        mainAxisAlignment:
+                                                            MainAxisAlignment
+                                                                .spaceBetween,
+                                                        children: [
+                                                          Text(
+                                                            vnd.format(
+                                                              product['sale_price'],
+                                                            ),
+                                                            style:
+                                                                const TextStyle(
+                                                                  color: Color(
+                                                                    0xff1763c0,
+                                                                  ),
+                                                                  fontWeight:
+                                                                      FontWeight
+                                                                          .w800,
+                                                                  fontSize: 17,
+                                                                ),
+                                                          ),
+                                                          Text(
+                                                            'Còn ${product['stock']}',
+                                                          ),
+                                                        ],
+                                                      ),
+                                                    ],
+                                                  ),
+                                                ),
+                                              );
+                                            },
+                                          ),
+                                  ),
+                                ],
+                              ),
                             ),
-                          ],
-                        ),
-                      ),
+                    ),
+                  ],
+                ),
               ),
             ],
           ),

@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 
 import '../../core/local_service.dart';
+import '../audit/document_audit_button.dart';
 import '../../core/auth/permissions.dart';
 import '../pos/pricing.dart';
 import '../pos/sales_service.dart';
@@ -929,6 +930,10 @@ class _TailoringPageState extends State<TailoringPage> {
                           },
                           icon: const Icon(Icons.picture_as_pdf_outlined),
                           label: const Text('Phiếu đo PDF'),
+                        ),
+                        DocumentAuditButton(
+                          service: widget.service,
+                          documentId: row['id'] as String,
                         ),
                         if ((row['status'] as int) < 3)
                           FilledButton.tonal(

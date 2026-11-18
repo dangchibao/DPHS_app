@@ -15,6 +15,16 @@ Future<Uint8List> payrollPdf(LocalService service, String id) async {
     'SELECT p.*,v.reason AS void_reason,EXISTS(SELECT 1 FROM payroll_reconciliations r WHERE r.store_id=p.store_id AND r.run_id=p.id) AS needs_reconcile FROM payroll_runs p LEFT JOIN payroll_voids v ON v.store_id=p.store_id AND v.run_id=p.id WHERE p.store_id=? AND p.id=?',
     [service.storeId, id],
   )).single;
+  await service.db.transaction(
+    () => service.audit(
+      'PAYROLL_SLIP_VIEW',
+      'payroll_run',
+      id,
+      reason: 'Xem/xuất phiếu lương',
+      severity: 'sensitive',
+      changes: {'run_id': id},
+    ),
+  );
   final store = (await service.db.rows(
     'SELECT name,code FROM stores WHERE id=?',
     [service.storeId],

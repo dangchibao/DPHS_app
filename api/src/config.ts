@@ -1,4 +1,4 @@
-// Cấu hình tập trung; kiểm chứng 15/11/2026. Không dùng để tính hóa đơn.
+// Cấu hình tập trung; kiểm chứng 17/11/2026. Không dùng để tính hóa đơn.
 export const cloudBudget = {
   workersRequestsPerDay: 100_000,
   workersCpuMs: 10,
@@ -23,4 +23,13 @@ export const syncLimits = {
   maxProcessedMutations: 3,
 } as const;
 // Mức dữ liệu đồng bộ tối thiểu; không dùng header này thay kiểm tra quyền.
-export const minimumSyncSchema = 22;
+export const minimumSyncSchema = 30;
+export const reportLimits = {
+  pageRows: 25,
+  pageBytes: 500000,
+  cacheBytes: 250000,
+  rebuildDocuments: 3,
+  maxDays: 366,
+  refreshEvents: 2000,
+  refreshRows: 100,
+} as const;

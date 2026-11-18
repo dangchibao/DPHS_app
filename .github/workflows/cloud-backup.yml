@@ -1,0 +1,75 @@
+name: Sao lưu D1 riêng tư
+on:
+  schedule:
+    - cron: "30 19 * * *" # 02:30 Việt Nam; GitHub có thể chạy trễ.
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: private-d1-backup
+  cancel-in-progress: false
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    environment: private-backup
+    steps:
+      - uses: actions/checkout@v4
+      # Environment variables chỉ có sau khi job nhận environment.
+      - name: Kiểm tra điều kiện bật backup
+        id: gate
+        env:
+          CLOUD_BACKUP_ENABLED: ${{ vars.CLOUD_BACKUP_ENABLED }}
+          R2_PRIVATE_BACKUP_CONFIRMED: ${{ vars.R2_PRIVATE_BACKUP_CONFIRMED }}
+        run: python3 scripts/cloud_backup_gate.py
+      - uses: actions/setup-node@v4
+        if: steps.gate.outputs.enabled == 'true'
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: api/package-lock.json
+      - uses: actions/setup-python@v5
+        if: steps.gate.outputs.enabled == 'true'
+        with:
+          python-version: "3.12"
+      - run: npm ci
+        if: steps.gate.outputs.enabled == 'true'
+        working-directory: api
+      - name: Kiểm tra công cụ và logic xoay vòng
+        if: steps.gate.outputs.enabled == 'true'
+        run: |
+          gpg --version
+          aws --version
+          python -m unittest discover -s scripts -p test_cloud_backup.py -v
+      - name: Xuất, diễn tập local, mã hóa và sao lưu
+        if: steps.gate.outputs.enabled == 'true'
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+          D1_DATABASE_ID: ${{ vars.D1_DATABASE_ID }}
+          R2_BUCKET: ${{ vars.R2_BACKUP_BUCKET }}
+          R2_ENDPOINT_URL: ${{ vars.R2_ENDPOINT_URL }}
+          R2_BACKUP_STORAGE_BUDGET_BYTES: ${{ vars.R2_BACKUP_STORAGE_BUDGET_BYTES || '8000000000' }}
+          BACKUP_GPG_FINGERPRINT: ${{ vars.BACKUP_GPG_FINGERPRINT }}
+          BACKUP_GPG_PUBLIC_KEY: ${{ secrets.BACKUP_GPG_PUBLIC_KEY }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.D1_BACKUP_API_TOKEN }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_BACKUP_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_BACKUP_SECRET_ACCESS_KEY }}
+          AWS_EC2_METADATA_DISABLED: "true"
+        run: python scripts/cloud_backup.py backup --execute-cloud --report artifacts/cloud-backup-status.json
+      - name: Báo cáo trạng thái an toàn
+        if: always() && steps.gate.outputs.enabled == 'true'
+        shell: bash
+        run: |
+          if [ -f artifacts/cloud-backup-status.json ]; then
+            echo '### Sao lưu D1' >> "$GITHUB_STEP_SUMMARY"
+            cat artifacts/cloud-backup-status.json >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo 'Sao lưu chưa chạy hoặc thất bại trước bước xuất. Xem trạng thái job; không có bản mới được xác nhận.' >> "$GITHUB_STEP_SUMMARY"
+          fi
+      - uses: actions/upload-artifact@v4
+        if: always() && steps.gate.outputs.enabled == 'true'
+        with:
+          name: cloud-backup-status
+          path: artifacts/cloud-backup-status.json
+          if-no-files-found: ignore
+          retention-days: 7

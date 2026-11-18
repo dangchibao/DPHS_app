@@ -310,7 +310,8 @@ it("Mô phỏng 3 cửa hàng, 10 thiết bị, 900 hóa đơn/ngày", async () 
     const feedRows = Number(
       sqlite.prepare("SELECT COUNT(*) AS n FROM change_feed").get()!.n,
     );
-    const reads = polls * 8 + requests * 5 + 900 * 40 + feedRows * 6;
+    // Bổ sung ngân sách lookup/JSON-cache, chưa thay cho D1 meta thực tế.
+    const reads = polls * 8 + requests * 5 + 900 * 140 + feedRows * 6;
     const pageSize = Number(
         sqlite.prepare("PRAGMA page_size").get()!.page_size,
       ),
@@ -326,7 +327,20 @@ it("Mô phỏng 3 cửa hàng, 10 thiết bị, 900 hóa đơn/ngày", async () 
         )
         .get()!.total,
     ).toBe(306000000);
-    const report = `# Mô phỏng tải — 3 cửa hàng / 10 thiết bị\n\nĐã chạy ${now}. Mô phỏng SQLite dùng cùng migration và hàm push của Workers; không phải benchmark CPU cloud.\n\n900 hóa đơn/ngày (300/cửa hàng), 4 dòng/hóa đơn, 1 thanh toán, ${partial} đơn đặt cọc, 2 audit client và 1 audit API/hóa đơn. Kiểm tra tổng thu: 306.000.000đ.\n\n|Chỉ số|Kết quả / ước tính|Free|\n|---|---:|---:|\n|Requests (12 giờ, pull 60 giây, directory + 3 scope, tính bảo thủ mọi máy có quyền audit)|${requests}|${cloudBudget.workersRequestsPerDay}|\n|Rows read (ngân sách bảo thủ, cần đối chiếu D1 meta)|${reads}|${cloudBudget.d1RowsReadPerDay}|\n|Rows written cơ sở SQLite, gồm trigger|${baseWrites}|—|\n|Ghi index ước tính theo schema|${indexWrites}|—|\n|Tổng rows written ước tính|${writes}|${cloudBudget.d1RowsWrittenPerDay}|\n|Dung lượng SQLite của dữ liệu mô phỏng|${bytes} bytes|${cloudBudget.d1DatabaseBytes} bytes/database|\n\n${writes <= cloudBudget.d1RowsWrittenPerDay ? "Kịch bản cơ sở nằm trong ngân sách ghi ước tính." : "Kịch bản vượt ngân sách ghi; không được tuyên bố đạt 0đ/tháng ở tải này."} Còn phải tính báo cáo tổng hợp, quản trị, các lần ghi retry, bookkeeping nội bộ D1 và dịch vụ khác dùng chung account. Không chứng minh CPU 10ms bằng thời gian test SQLite; cần profiling Workers trước production.\n\nBản tính index dùng tăng số entry từng index, có lọc predicate của partial index; chưa phải số đo billing D1. Cần đo meta.rows_written/rows_read và analytics trên môi trường cloud do chủ cấp phép. Kịch bản 8 dòng/hóa đơn, nhiều audit/đổi trả hoặc thêm bảng tổng hợp có thể vượt Free.\n\nChange feed đang lưu toàn bộ để chưa làm mất dữ liệu thiết bị offline. Không cam kết dung lượng miễn phí lâu dài: phải đo tăng trưởng và hoàn thiện snapshot/cursor expiry/lưu trữ trước khi bật retention. D1 export cần đo riêng ngoài giờ; không tính là 0 reads khi chưa có bằng chứng.\n\nNguồn hạn mức: ${cloudBudget.sources.join(" ; ")}\n`;
+    expect(
+      sqlite.prepare("SELECT COUNT(*) AS n FROM report_receipts").get()!.n,
+    ).toBe(900);
+    expect(
+      sqlite
+        .prepare(
+          "SELECT SUM(CAST(json_extract(metrics_json,'$.revenue') AS INTEGER)) AS n FROM daily_reports",
+        )
+        .get()!.n,
+    ).toBe(360000000);
+    expect(
+      sqlite.prepare("SELECT MAX(overflow) AS n FROM daily_reports").get()!.n,
+    ).toBe(0);
+    const report = `# Mô phỏng tải — schema ${Number(sqlite.prepare("SELECT MAX(version) n FROM schema_metadata").get()!.n)} / 3 cửa hàng / 10 thiết bị\n\nĐã chạy ${now}. Mô phỏng SQLite dùng cùng migration và hàm push của Workers; không phải benchmark CPU cloud.\n\n900 hóa đơn/ngày (300/cửa hàng), 4 dòng/hóa đơn, 1 thanh toán, ${partial} đơn đặt cọc, 2 audit client và 1 audit API/hóa đơn. Kiểm tra tổng thu: 306.000.000đ.\n\n|Chỉ số|Kết quả / ước tính|Free|\n|---|---:|---:|\n|Requests (12 giờ, pull 60 giây, directory + 3 scope, tính bảo thủ mọi máy có quyền audit)|${requests}|${cloudBudget.workersRequestsPerDay}|\n|Rows read (ngân sách bảo thủ, cần đối chiếu D1 meta)|${reads}|${cloudBudget.d1RowsReadPerDay}|\n|Rows written cơ sở SQLite, gồm trigger|${baseWrites}|—|\n|Ghi index ước tính theo schema|${indexWrites}|—|\n|Tổng rows written ước tính|${writes}|${cloudBudget.d1RowsWrittenPerDay}|\n|Dung lượng SQLite của dữ liệu mô phỏng|${bytes} bytes|${cloudBudget.d1DatabaseBytes} bytes/database|\n\n${writes <= cloudBudget.d1RowsWrittenPerDay ? (writes > cloudBudget.d1RowsWrittenPerDay * 0.9 ? "Kịch bản sát hạn mức ghi; không đủ phần dư an toàn cho nghiệp vụ thường ngày và backup." : "Kịch bản cơ sở nằm trong ngân sách ghi ước tính.") : "Kịch bản vượt ngân sách ghi; không được tuyên bố đạt 0đ/tháng ở tải này."} Đã gồm tổng hợp tài chính, receipt chống đếm trùng và cache công nợ ban đầu. Còn phải tính các lượt đọc báo cáo, thu nợ tiếp, may/đổi trả/giữ/chuyển kho, chấm công/lương, nhật ký đọc/đăng nhập, quản trị, retry, bookkeeping D1 và dịch vụ dùng chung account. Không chứng minh CPU 10ms bằng thời gian test SQLite; cần profiling Workers trước production.\n\nBản tính index dùng tăng số entry từng index, có lọc predicate của partial index; chưa phải số đo billing D1. Cần đo meta.rows_written/rows_read và analytics trên môi trường cloud do chủ cấp phép. Kịch bản 8 dòng/hóa đơn, nhiều audit/đổi trả hoặc nghiệp vụ bổ sung có thể vượt Free; không coi phần dư của kịch bản này là ngân sách vận hành an toàn.\n\nFeed nghiệp vụ vẫn giữ toàn bộ để không mất dữ liệu máy offline; schema 30 có compaction audit riêng sau file private verified, phần đó chưa được chạy trong mô phỏng này. Không cam kết dung lượng miễn phí lâu dài: phải đo tăng trưởng và hoàn thiện snapshot/cursor expiry/lưu trữ trước khi bật retention. D1 export cần đo riêng ngoài giờ; không tính là 0 reads khi chưa có bằng chứng.\n\nNguồn hạn mức: ${cloudBudget.sources.join(" ; ")}\n`;
     writeFileSync("../docs/phases/load-simulation.md", report, "utf8");
     console.log(
       JSON.stringify({

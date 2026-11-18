@@ -51,7 +51,7 @@ it("Phiên sync không quản trị được, logout không làm mất quyền g
           new Request("http://localhost/sync/pull?cursor=0", {
             headers: {
               Authorization: `Bearer ${sync}`,
-              "X-Client-Schema": "22",
+              "X-Client-Schema": "30",
             },
           }),
           env,

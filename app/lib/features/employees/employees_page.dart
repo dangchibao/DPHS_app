@@ -3,10 +3,14 @@ import 'package:material_ui/material_ui.dart';
 import '../../core/local_service.dart';
 import '../../core/auth/permissions.dart';
 import 'personnel_service.dart';
+import '../../core/sync/cloud_api.dart';
+import 'staff_handoffs_page.dart';
 
 class EmployeesPage extends StatefulWidget {
-  const EmployeesPage({super.key, required this.service});
-  final LocalService service;
+  const EmployeesPage({super.key, required this.service}) : api = null;
+  const EmployeesPage.online({super.key, required this.api}) : service = null;
+  final LocalService? service;
+  final CloudApi? api;
   @override
   State<EmployeesPage> createState() => _EmployeesPageState();
 }
@@ -20,7 +24,15 @@ class _EmployeesPageState extends State<EmployeesPage> {
   }
 
   void reload() {
-    entries = widget.service.employees();
+    entries = widget.service?.employees() ?? onlineEmployees();
+  }
+
+  Future<List<Map<String, Object?>>> onlineEmployees() async {
+    final result = await widget.api!.send('/staff');
+    return [
+      for (final row in result['users'] as List)
+        Map<String, Object?>.from(row as Map),
+    ];
   }
 
   Future<void> edit([Map<String, Object?>? user]) async {
@@ -113,15 +125,40 @@ class _EmployeesPageState extends State<EmployeesPage> {
     );
     if (accepted == true) {
       try {
-        await widget.service.saveEmployee(
-          id: user?['id'] as String?,
-          username: username.text,
-          name: name.text,
-          role: role,
-          password: password.text,
-          reason: reason.text,
-          active: active,
-        );
+        if (widget.service != null) {
+          await widget.service!.saveEmployee(
+            id: user?['id'] as String?,
+            username: username.text,
+            name: name.text,
+            role: role,
+            password: password.text,
+            reason: reason.text,
+            active: active,
+          );
+        } else {
+          if (name.text.trim().isEmpty ||
+              username.text.trim().isEmpty ||
+              reason.text.trim().isEmpty) {
+            throw ArgumentError('Nhập tài khoản, họ tên và lý do.');
+          }
+          if (user == null && password.text.length < 10) {
+            throw ArgumentError('Mật khẩu tối thiểu 10 ký tự.');
+          }
+          final response = await widget.api!.saveStaff({
+            if (user != null) 'id': user['id'],
+            'username': username.text.trim(),
+            'display_name': name.text.trim(),
+            'role': role.name,
+            'active': active,
+            'reason': reason.text.trim(),
+            if (user == null) 'password': password.text,
+          });
+          if (response['handoff_required'] == true) {
+            throw StateError(
+              'Yêu cầu bàn giao đã tạo. Mở “Bàn giao quyền” để chờ các máy rồi hoàn tất.',
+            );
+          }
+        }
         if (mounted) setState(reload);
       } catch (e) {
         if (mounted) {
@@ -150,6 +187,22 @@ class _EmployeesPageState extends State<EmployeesPage> {
                 style: TextStyle(fontSize: 26, fontWeight: FontWeight.w800),
               ),
             ),
+            if ((widget.api ?? widget.service?.syncEngine?.api) != null)
+              IconButton(
+                onPressed: () => Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => Scaffold(
+                      appBar: AppBar(title: const Text('Bàn giao nhân viên')),
+                      body: StaffHandoffsPage(
+                        api: widget.api ?? widget.service!.syncEngine!.api,
+                        sync: widget.service?.syncEngine?.sync,
+                      ),
+                    ),
+                  ),
+                ),
+                icon: const Icon(Icons.swap_horiz),
+                tooltip: 'Bàn giao quyền',
+              ),
             FilledButton.icon(
               onPressed: () => edit(),
               icon: const Icon(Icons.person_add_outlined),

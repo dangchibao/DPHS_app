@@ -14,3 +14,17 @@ backups/
 artifacts/
 *.log
 !pubspec.lock
+
+__pycache__/
+*.jks
+*.keystore
+*.p12
+*.pfx
+*.credential.xml
+cloud-backup-private.asc
+cloud-backup-gpg/
+**/key.properties
+api/wrangler.production.local.jsonc
+api/wrangler.staging.local.jsonc
+api/wrangler.e2e.local.jsonc
+app/android/build/

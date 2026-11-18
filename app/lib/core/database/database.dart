@@ -24,7 +24,7 @@ class AppDatabase extends GeneratedDatabase {
     if (releaseLock) await releaseFileLock();
   }
 
-  static const currentSchemaVersion = 22;
+  static const currentSchemaVersion = 30;
   @override
   int get schemaVersion => currentSchemaVersion;
   @override
@@ -56,6 +56,14 @@ class AppDatabase extends GeneratedDatabase {
         '0020_transfers.sql',
         '0021_attendance.sql',
         '0022_payroll.sql',
+        '0023_reports_access.sql',
+        '0024_cloud_reports.sql',
+        '0025_web_devices.sql',
+        '0026_bank_accounts.sql',
+        '0027_product_media.sql',
+        '0028_staff_handoffs.sql',
+        '0029_stock_thresholds.sql',
+        '0030_audit_archives.sql',
       ]) {
         await applySql(await rootBundle.loadString('assets/migrations/$file'));
       }
@@ -84,6 +92,14 @@ class AppDatabase extends GeneratedDatabase {
         '0020_transfers.sql',
         '0021_attendance.sql',
         '0022_payroll.sql',
+        '0023_reports_access.sql',
+        '0024_cloud_reports.sql',
+        '0025_web_devices.sql',
+        '0026_bank_accounts.sql',
+        '0027_product_media.sql',
+        '0028_staff_handoffs.sql',
+        '0029_stock_thresholds.sql',
+        '0030_audit_archives.sql',
       ];
       if (from < 1 || to > files.length || from >= to) {
         throw StateError('Chưa hỗ trợ migration $from → $to');

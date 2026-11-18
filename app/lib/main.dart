@@ -7,6 +7,7 @@ import 'features/auth/login_page.dart';
 import 'features/auth/session_boundary.dart';
 import 'features/shell/sync_status_bar.dart';
 import 'features/shell/workspace.dart';
+import 'features/web/web_portal.dart';
 
 void main() => runApp(const ProviderScope(child: NgocThanhApp()));
 
@@ -83,11 +84,7 @@ class _AppRootState extends ConsumerState<AppRoot> {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
     if (kIsWeb) {
-      return const Scaffold(
-        body: Center(
-          child: Text('Web quản lý online sẽ kết nối sau khi cấu hình API.'),
-        ),
-      );
+      return const WebPortal();
     }
     return ref
         .watch(localServiceProvider)

@@ -15,12 +15,20 @@ export async function auditStatement(
   documentCode: string | null = null,
 ): Promise<D1PreparedStatement> {
   changes = redactAuditChanges(changes, action);
-  const previous = await db
+  const previousLog = await db
     .prepare(
       "SELECT hash,chain_index FROM audit_logs WHERE store_id=? AND device_id=? AND chain_index<0 ORDER BY chain_index ASC LIMIT 1",
     )
     .bind(actor.store_id, actor.device_id)
     .first<{ hash: string; chain_index: number }>();
+  const previous =
+    previousLog ??
+    (await db
+      .prepare(
+        "SELECT hash,chain_index FROM audit_chain_checkpoints WHERE store_id=? AND device_id=? AND direction=-1 ORDER BY upto DESC LIMIT 1",
+      )
+      .bind(actor.store_id, actor.device_id)
+      .first<{ hash: string; chain_index: number }>());
   const id = crypto.randomUUID(),
     now = new Date().toISOString(),
     index = (previous?.chain_index ?? 0) - 1;
@@ -40,13 +48,17 @@ export async function auditStatement(
           .bind(actor.store_id, entity)
           .first<{ code: string }>()
       : null;
-  const entityType = documentAction
-    ? "document"
-    : action.startsWith("DEVICE_")
-      ? "device"
-      : action.startsWith("STORE_")
-        ? "store"
-        : "user";
+  const entityType = action.startsWith("AUDIT_ARCHIVE_")
+    ? "audit_archive"
+    : action === "PRODUCT_WEB_SAVE"
+      ? "variant"
+      : documentAction
+        ? "document"
+        : action.startsWith("DEVICE_")
+          ? "device"
+          : action.startsWith("STORE_")
+            ? "store"
+            : "user";
   const payload = {
     id,
     store_id: actor.store_id,
@@ -82,10 +94,31 @@ export async function auditStatement(
       reason,
       now,
       now,
-      "0.5.0",
+      "0.7.0",
       "sensitive",
       previous?.hash ?? "",
       hash,
       index,
     );
+}
+
+export async function clientAuditHead(
+  db: D1Database,
+  store: string,
+  device: string,
+) {
+  return (
+    (await db
+      .prepare(
+        "SELECT hash,chain_index FROM audit_logs WHERE store_id=? AND device_id=? AND chain_index>0 ORDER BY chain_index DESC LIMIT 1",
+      )
+      .bind(store, device)
+      .first()) ??
+    (await db
+      .prepare(
+        "SELECT hash,chain_index FROM audit_chain_checkpoints WHERE store_id=? AND device_id=? AND direction=1 ORDER BY upto DESC LIMIT 1",
+      )
+      .bind(store, device)
+      .first()) ?? { chain_index: 0, hash: "" }
+  );
 }

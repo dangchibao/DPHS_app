@@ -2,6 +2,7 @@ import 'package:material_ui/material_ui.dart';
 import 'package:intl/intl.dart';
 
 import '../../core/local_service.dart';
+import '../audit/document_audit_button.dart';
 import 'debt_service.dart';
 
 class DebtsPage extends StatefulWidget {
@@ -272,6 +273,10 @@ class _DebtsPageState extends State<DebtsPage> {
                                 onPressed: () => history(r),
                                 icon: const Icon(Icons.history),
                                 label: const Text('Lịch sử thu'),
+                              ),
+                              DocumentAuditButton(
+                                service: widget.service,
+                                documentId: r['id'] as String,
                               ),
                               FilledButton.icon(
                                 onPressed:

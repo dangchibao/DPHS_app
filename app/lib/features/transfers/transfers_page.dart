@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 
 import '../../core/local_service.dart';
+import '../audit/document_audit_button.dart';
 import '../pos/sales_service.dart';
 import 'transfer_service.dart';
 
@@ -191,6 +192,10 @@ class _TransfersPageState extends State<TransfersPage> {
                                   'Đến ${meta['target_store_code']} · máy ${meta['target_device_code']} · ${_date(d['issued_at'])}',
                                 ),
                                 _counts(d),
+                                DocumentAuditButton(
+                                  service: widget.service,
+                                  documentId: d['id'] as String,
+                                ),
                                 Text(meta['notes'] as String? ?? ''),
                                 if (d['receipt_code'] != null)
                                   Text(
@@ -237,6 +242,11 @@ class _TransfersPageState extends State<TransfersPage> {
                               'Từ ${o['source_store_code']} · ${_date(o['dispatched_at'])}',
                             ),
                             _counts(o),
+                            if (o['receipt_id'] != null)
+                              DocumentAuditButton(
+                                service: widget.service,
+                                documentId: o['receipt_id'] as String,
+                              ),
                             Text(o['notes'] as String),
                             if (o['receipt_id'] == null)
                               FilledButton(

@@ -57,10 +57,12 @@ export function payrollPeriod(value: unknown) {
     ).toISOString(),
   };
 }
-async function watermark(db: D1Database, store: string) {
+const sourceTypes =
+  "entity_type IN ('documents','invoice_lines','return_lines','attendance_entries','attendance_rejections','payments','receivable_entries','receivable_adjustments')";
+async function watermark(db: D1Database, store: string, full = false) {
   return (await db
     .prepare(
-      "SELECT COALESCE((SELECT MAX(server_seq) FROM change_feed WHERE store_id=?),0) AS business_seq,COALESCE((SELECT MAX(server_seq) FROM payroll_feed WHERE store_id=?),0) AS private_seq",
+      `SELECT COALESCE((SELECT server_seq FROM change_feed WHERE store_id=? ${full ? "" : `AND ${sourceTypes}`} ORDER BY server_seq DESC LIMIT 1),0) AS business_seq,COALESCE((SELECT MAX(server_seq) FROM payroll_feed WHERE store_id=?),0) AS private_seq`,
     )
     .bind(store, store)
     .first<{ business_seq: number; private_seq: number }>())!;
@@ -88,10 +90,11 @@ function guard(
   id: string,
   store: string,
   seq: { business_seq: number; private_seq: number },
+  full = false,
 ) {
   return db
     .prepare(
-      "INSERT INTO payroll_guards SELECT ?,?,?,COALESCE((SELECT MAX(server_seq) FROM change_feed WHERE store_id=?),0),?,COALESCE((SELECT MAX(server_seq) FROM payroll_feed WHERE store_id=?),0)",
+      `INSERT INTO payroll_guards SELECT ?,?,?,COALESCE((SELECT server_seq FROM change_feed WHERE store_id=? ${full ? "" : `AND ${sourceTypes}`} ORDER BY server_seq DESC LIMIT 1),0),?,COALESCE((SELECT MAX(server_seq) FROM payroll_feed WHERE store_id=?),0)`,
     )
     .bind(id, store, seq.business_seq, store, seq.private_seq, store);
 }
@@ -128,7 +131,7 @@ export async function payrollPreview(
       .bind(actor.store_id, employeeId, period.start, period.end),
     db
       .prepare(
-        "SELECT d.id,d.code,d.name,MAX(c.received_at) AS checkpoint FROM devices d LEFT JOIN sync_checkpoints c ON c.store_id=d.store_id AND c.device_id=d.id AND c.received_at>=? WHERE d.store_id=? AND d.status='approved' AND d.created_at<? GROUP BY d.id,d.code,d.name ORDER BY d.code",
+        "SELECT d.id,d.code,d.name,MAX(c.received_at) AS checkpoint FROM devices d LEFT JOIN sync_checkpoints c ON c.store_id=d.store_id AND c.device_id=d.id AND c.received_at>=? WHERE d.store_id=? AND d.status='approved' AND d.kind='native' AND d.created_at<? GROUP BY d.id,d.code,d.name ORDER BY d.code",
       )
       .bind(period.to, actor.store_id, period.to),
     db
@@ -185,6 +188,31 @@ export async function payrollPreview(
     period_complete: Date.now() >= Date.parse(period.to),
   };
 }
+export async function payrollViewPreview(
+  db: D1Database,
+  actor: Actor,
+  employee: unknown,
+  month: unknown,
+) {
+  checkPermission(actor.role, "payroll", actor.issued_role);
+  const employeeId = text(employee, "Nhân viên"),
+    period = payrollPeriod(month);
+  await db.batch([
+    await auditStatement(
+      db,
+      actor,
+      "PAYROLL_PREVIEW_VIEW",
+      employeeId,
+      "Đối soát dự tính lương",
+      {
+        employee_id: employeeId,
+        period_start: period.start,
+        period_end: period.end,
+      },
+    ),
+  ]);
+  return payrollPreview(db, actor, employeeId, period.month);
+}
 export async function syncCheckpoint(db: D1Database, actor: Actor, body: Row) {
   if (actor.session_kind === "sync")
     throw new ApiError(403, "Cần phiên tương tác để đối soát máy.");
@@ -202,7 +230,7 @@ export async function syncCheckpoint(db: D1Database, actor: Actor, body: Row) {
       400,
       "Chỉ đối soát sau khi gửi hết hàng đợi và kéo hết dữ liệu.",
     );
-  const seq = await watermark(db, actor.store_id);
+  const seq = await watermark(db, actor.store_id, true);
   if (body.cursor !== seq.business_seq)
     throw new ApiError(
       409,
@@ -210,7 +238,7 @@ export async function syncCheckpoint(db: D1Database, actor: Actor, body: Row) {
     );
   const id = crypto.randomUUID();
   await db.batch([
-    guard(db, id, actor.store_id, seq),
+    guard(db, id, actor.store_id, seq, true),
     db
       .prepare("INSERT OR IGNORE INTO sync_checkpoints VALUES(?,?,?,?)")
       .bind(actor.store_id, actor.device_id, day, now),
@@ -222,6 +250,43 @@ export async function payrollPull(db: D1Database, actor: Actor, url: URL) {
   checkPermission(actor.role, "payroll", actor.issued_role);
   if (actor.session_kind === "sync")
     throw new ApiError(403, "Phiên nền không được đọc dữ liệu lương.");
+  const accessKind = `payroll:${new Date(Date.now() + 7 * 3600000).toISOString().slice(0, 10)}`;
+  const readMark = () =>
+    db
+      .prepare(
+        "SELECT accessed_at FROM private_access_marks WHERE store_id=? AND session_id=? AND kind=?",
+      )
+      .bind(actor.store_id, actor.session_id, accessKind)
+      .first();
+  if (!(await readMark())) {
+    try {
+      await db.batch([
+        db
+          .prepare("INSERT INTO private_access_marks VALUES(?,?,?,?)")
+          .bind(
+            actor.store_id,
+            actor.session_id,
+            accessKind,
+            new Date().toISOString(),
+          ),
+        await auditStatement(
+          db,
+          actor,
+          "PAYROLL_ACCESS",
+          actor.user_id,
+          "Truy cập luồng dữ liệu lương đầu phiên/ngày",
+          { user_id: actor.user_id, status: "accessed" },
+        ),
+      ]);
+    } catch (error) {
+      if (
+        !/UNIQUE constraint failed/.test(String(error)) ||
+        !(await readMark())
+      ) {
+        throw error;
+      }
+    }
+  }
   const cursor = Number(url.searchParams.get("cursor") ?? "0");
   if (!Number.isSafeInteger(cursor) || cursor < 0)
     throw new ApiError(400, "Cursor không hợp lệ.");

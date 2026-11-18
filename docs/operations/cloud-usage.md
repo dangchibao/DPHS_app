@@ -1,0 +1,19 @@
+# Hạn mức cloud và thay đổi gói thủ công
+
+Chủ xem menu **Hạn mức cloud** trên native hoặc Web online. API chỉ cho chủ với quyền hiện tại và quyền lúc cấp phiên; không cho token sync. Hiện số requests Workers toàn account/ngày UTC, rows read/written D1 toàn account/ngày, dung lượng riêng database POS; từ 80% cảnh báo, 100% báo đạt ngân sách. Phần không có số đo hiện rõ chưa đo, không hiển thị 0 giả.
+
+Worker dùng constants tập trung trong `api/src/config.ts` đã đối chiếu tài liệu chính thức. `CF_ANALYTICS_TOKEN` là secret chỉ đọc Analytics và `CLOUDFLARE_ACCOUNT_ID` là variable tại Worker; không gửi xuống app. Chỉ chủ cấu hình sau khi cho phép dùng cloud, theo [hướng dẫn token Analytics](https://developers.cloudflare.com/analytics/graphql-api/getting-started/authentication/api-token-auth/). Không dùng chung token backup có quyền ghi D1. Truy vấn GraphQL cố định, không nhận query/account từ client. Worker cache 60 giây; banner native chủ kiểm tra mỗi 5 phút, màn chi tiết tải theo yêu cầu.
+
+Nếu chưa cấu hình hoặc Analytics lỗi/không có execution data, số dùng ngày tương ứng là chưa biết. Analytics có thể trễ/lấy mẫu; đối chiếu dashboard/billing và `meta.rows_read/rows_written` khi thử tải thật. Dung lượng POS đọc từ `meta.size_after` nếu nền tảng có cung cấp. Chưa đo dung lượng toàn account/R2 hoặc CPU từng request trong màn này; không dùng D1 query latency làm CPU Worker. Reset hạn mức ngày lúc 00:00 UTC, tức 07:00 Việt Nam; cache không mang số ngày cũ sang ngày mới.
+
+Khi gần hạn mức: ưu tiên gửi giao dịch, giảm tải ảnh/báo cáo, theo dõi tăng dung lượng. Không xóa queue, ledger, audit, processed mutation hoặc reset cursor để giải phóng tạm. Windows/Android tiếp tục bán cục bộ trong giới hạn tồn đã phân bổ, giữ outbox; Web cần mạng. Lỗi quota/backoff hiển thị ở thanh đồng bộ; một request được retry không tạo lại giao dịch. Mô phỏng schema 24 với 900 HD/ngày/4 dòng/3 cửa hàng/10 máy đã ước tính 96.483 lượt ghi, chưa gồm mọi nghiệp vụ/retry/ảnh. Không coi 900 HD/ngày là tải mặc định an toàn trong Free.
+
+## Nếu chủ quyết định nâng gói
+
+1. Kiểm tra số đo, chỉ rõ nguồn chạm giới hạn: requests/CPU/reads/writes/dung lượng/Actions/R2. Xem mức giá và ngân sách trên dashboard; chỉ chủ cho phép dùng phí riêng. Ứng dụng không tự mua hoặc bật thanh toán.
+2. Backup + thử restore trước khi đổi cấu hình; giữ app/outbox/danh tính thiết bị. Thay gói ở Cloudflare Dashboard, kiểm tra binding D1/R2 và quyền token vẫn đúng; không cần chuyển Firebase hoặc sửa client.
+3. Nếu hạn mức/ngân sách giám sát thay đổi, đặt Worker variable `CLOUD_BUDGET_JSON` với các khóa cần thay: `workersRequestsPerDay`, `workersCpuMs`, `d1RowsReadPerDay`, `d1RowsWrittenPerDay`, `d1DatabaseBytes`, `d1AccountBytes`. Chỉ số nguyên dương; khóa lạ/lỗi JSON bị từ chối. Giá trị phải dựa trên gói hiện hành và ngân sách do chủ chọn. Biến này **chỉ đổi ngưỡng giám sát**, không mua gói hoặc thay hard limit của Cloudflare, không sửa logic tiền/tồn/quyền.
+4. Cập nhật cấu hình CPU/hard caps ở dashboard/Wrangler nếu gói yêu cầu, sau khi kiểm chứng bằng staging. Tải lại số đo sau cache, chạy một lô sync/replay + báo cáo; kiểm tra chi phí thực tế. Không tự tăng polling vì đã đổi gói.
+5. Nếu quay về Free, trước tiên giảm dữ liệu/tải về trong hạn mức, backup và đối soát. Không giả định database quá dung lượng sẽ tự thu nhỏ hoặc billing tự ngừng.
+
+Nguồn kiểm tra 17/11/2026: [Workers limits](https://developers.cloudflare.com/workers/platform/limits/), [D1 pricing](https://developers.cloudflare.com/d1/platform/pricing/), [D1 limits](https://developers.cloudflare.com/d1/platform/limits/), [D1 Analytics và coverage](https://developers.cloudflare.com/d1/observability/metrics-analytics/), [Workers GraphQL](https://developers.cloudflare.com/analytics/graphql-api/tutorials/querying-workers-metrics/). Chưa gọi Analytics thật hoặc thay cấu hình cloud trong phiên phát triển.

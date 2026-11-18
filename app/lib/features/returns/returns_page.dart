@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 
 import '../../core/local_service.dart';
+import '../audit/document_audit_button.dart';
 import '../../core/auth/permissions.dart';
 import 'return_pricing.dart';
 import 'return_service.dart';
@@ -165,20 +166,30 @@ class _ReturnsPageState extends State<ReturnsPage> {
                         'Gốc: ${metadata['original_code']}\nNhận lại ${_vnd.format(metadata['returned_value'])} · Hoàn ${_vnd.format(metadata['refund'])}',
                       ),
                       isThreeLine: true,
-                      trailing: IconButton(
-                        tooltip: 'Phiếu đổi/trả PDF',
-                        icon: const Icon(Icons.picture_as_pdf_outlined),
-                        onPressed: () async {
-                          try {
-                            await showReturnPdf(
-                              context,
-                              widget.service,
-                              row['id'] as String,
-                            );
-                          } catch (e) {
-                            message(e);
-                          }
-                        },
+                      trailing: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          DocumentAuditButton(
+                            compact: true,
+                            service: widget.service,
+                            documentId: row['id'] as String,
+                          ),
+                          IconButton(
+                            tooltip: 'Phiếu đổi/trả PDF',
+                            icon: const Icon(Icons.picture_as_pdf_outlined),
+                            onPressed: () async {
+                              try {
+                                await showReturnPdf(
+                                  context,
+                                  widget.service,
+                                  row['id'] as String,
+                                );
+                              } catch (e) {
+                                message(e);
+                              }
+                            },
+                          ),
+                        ],
                       ),
                     ),
                   );

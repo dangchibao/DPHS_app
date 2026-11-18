@@ -5,8 +5,8 @@
   "scripts": {
     "dev": "wrangler dev --local",
     "typecheck": "tsc --noEmit",
-    "lint": "prettier --check src test load *.ts",
-    "format": "prettier --write src test load *.ts",
+    "lint": "prettier --check src test load scripts *.ts",
+    "format": "prettier --write src test load scripts *.ts",
     "test": "vitest run",
     "simulate": "vitest run --config vitest.load.config.ts",
     "migrate:local": "wrangler d1 migrations apply DB --local",
@@ -15,6 +15,7 @@
   "devDependencies": {
     "@cloudflare/workers-types": "latest",
     "@types/node": "latest",
+    "esbuild": "0.28.2",
     "prettier": "^3.10.1",
     "typescript": "latest",
     "vitest": "latest",

@@ -1,3 +1,4 @@
+import { auditRecordDigest } from "./audit_archive_format";
 import { ApiError, checkPermission, money, sha256, text } from "./security";
 import type { Actor } from "./auth";
 import { validateSales } from "./sales";
@@ -18,6 +19,8 @@ import {
 } from "./attendance";
 import { rolePermissions } from "./security";
 import { cloudBudget, syncLimits } from "./config";
+import { reportProjection } from "./report_projection";
+import { bankConfig } from "./bank_account";
 
 export function recordJsonExpression(
   columns: readonly string[],
@@ -39,6 +42,25 @@ export function recordJsonExpression(
 }
 
 export const entityColumns: Record<string, readonly string[]> = {
+  stock_threshold_rules: [
+    "id",
+    "store_id",
+    "device_id",
+    "user_id",
+    "variant_id",
+    "threshold",
+    "version_key",
+    "created_at",
+  ],
+  bank_accounts: [
+    "id",
+    "store_id",
+    "device_id",
+    "user_id",
+    "config_json",
+    "updated_at",
+    "lww_key",
+  ],
   attendance_entries: attendanceColumns,
   transfer_events: [
     "id",
@@ -311,6 +333,7 @@ interface Mutation {
   records: SyncRecord[];
 }
 const mutableTables = new Set([
+  "bank_accounts",
   "size_rules",
   "tailoring_rules",
   "commercial_rules",
@@ -364,7 +387,43 @@ function validateRecord(
       ("device_id" in row && row.device_id !== actor.device_id)
     )
       throw new ApiError(403, "Dữ liệu khác cửa hàng hoặc thiết bị.");
-    if (record.table === "stock_movements") {
+    if (record.table === "stock_threshold_rules") {
+      checkPermission(actor.role, "catalog", actor.issued_role);
+      if (row.user_id !== actor.user_id)
+        throw new ApiError(403, "Sai người cấu hình ngưỡng kho.");
+      const stamp = Date.parse(text(row.created_at, "Thời điểm"));
+      if (
+        !/^[a-f0-9]{8}-[a-f0-9]{4}-7[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/i.test(
+          String(row.id),
+        ) ||
+        !Number.isSafeInteger(row.threshold) ||
+        Number(row.threshold) < 0 ||
+        !Number.isFinite(stamp) ||
+        stamp > Date.now() + 300000 ||
+        row.version_key !==
+          `${new Date(stamp).toISOString()}|${actor.device_id}|${row.id}`
+      )
+        throw new ApiError(400, "Ngưỡng hoặc phiên bản cảnh báo không hợp lệ.");
+      text(row.variant_id, "Biến thể");
+    } else if (record.table === "bank_accounts") {
+      checkPermission(actor.role, "configure", actor.issued_role);
+      if (row.id !== actor.store_id || row.user_id !== actor.user_id)
+        throw new ApiError(403, "Sai danh tính cấu hình ngân hàng.");
+      const timestamp = Date.parse(text(row.updated_at, "Thời điểm"));
+      if (
+        !Number.isFinite(timestamp) ||
+        timestamp > Date.now() + 300000 ||
+        typeof row.lww_key !== "string" ||
+        !row.lww_key.startsWith(`${row.updated_at}|`)
+      )
+        throw new ApiError(400, "Phiên bản cấu hình không hợp lệ.");
+      try {
+        bankConfig(JSON.parse(text(row.config_json, "Cấu hình", 90000)));
+      } catch (error) {
+        if (error instanceof ApiError) throw error;
+        throw new ApiError(400, "JSON cấu hình không hợp lệ.");
+      }
+    } else if (record.table === "stock_movements") {
       if (transfers.has(String(row.document_id))) {
         checkPermission(actor.role, "stock", actor.issued_role);
         return;
@@ -704,6 +763,29 @@ export async function push(
       seen.add(recordKey);
       if (record.table === "audit_logs") {
         const row = record.row;
+        const archived = await db
+          .prepare(
+            "SELECT store_id,device_id,record_digest FROM audit_archive_receipts WHERE id=?",
+          )
+          .bind(row.id)
+          .first<{
+            store_id: string;
+            device_id: string;
+            record_digest: string;
+          }>();
+        if (archived) {
+          if (
+            archived.store_id !== actor.store_id ||
+            archived.device_id !== actor.device_id ||
+            archived.record_digest !== (await auditRecordDigest(row))
+          )
+            throw new ApiError(
+              409,
+              "Nhật ký đã lưu trữ có nội dung khác.",
+              "AUDIT_ARCHIVED_CONFLICT",
+            );
+          continue;
+        }
         let changes: unknown;
         try {
           changes = JSON.parse(String(row.changes_json));
@@ -763,6 +845,12 @@ export async function push(
             (await db
               .prepare(
                 "SELECT hash FROM audit_logs WHERE store_id=? AND device_id=? AND chain_index=?",
+              )
+              .bind(actor.store_id, actor.device_id, index - 1)
+              .first<{ hash: string }>()) ??
+            (await db
+              .prepare(
+                "SELECT hash FROM audit_chain_checkpoints WHERE store_id=? AND device_id=? AND direction=1 AND chain_index=?",
               )
               .bind(actor.store_id, actor.device_id, index - 1)
               .first<{ hash: string }>());
@@ -903,6 +991,51 @@ export async function push(
       );
     }
     statements.push(...transfers.projections);
+    for (const record of mutation.records.filter(
+      (r) => r.table === "bank_accounts",
+    )) {
+      const config = JSON.parse(record.row.config_json as string) as Record<
+        string,
+        string
+      >;
+      statements.push(
+        await auditStatement(
+          db,
+          actor,
+          "BANK_ACCOUNT_SYNC",
+          actor.store_id,
+          "Tiếp nhận cấu hình chuyển khoản",
+          {
+            bank_name: config.bank_name,
+            account_last_four: config.account_number.slice(-4),
+            has_qr: config.qr_png.length > 0,
+          },
+        ),
+      );
+    }
+    if (
+      actor.device_kind === "web" &&
+      mutation.records.some((r) => r.table === "product_variants")
+    ) {
+      statements.push(
+        await auditStatement(
+          db,
+          actor,
+          "PRODUCT_WEB_SAVE",
+          String(
+            mutation.records.find((r) => r.table === "product_variants")!.row
+              .id,
+          ),
+          text(body.catalog_reason, "Lý do", 200),
+          {
+            variant_ids: mutation.records
+              .filter((r) => r.table === "product_variants")
+              .map((r) => r.row.id),
+          },
+        ),
+      );
+    }
+    statements.push(...(await reportProjection(db, actor, mutation.records)));
     for (const entry of mutation.records.filter(
       (r) => r.table === "attendance_entries",
     )) {

@@ -54,7 +54,7 @@ extension PersonnelService on LocalService {
     }
     final target = id ?? uuid.v7();
     if (onlineStaff != null) {
-      await onlineStaff!({
+      final response = await onlineStaff!({
         'id': target,
         'username': username,
         'display_name': name,
@@ -63,6 +63,11 @@ extension PersonnelService on LocalService {
         'reason': reason,
         if (id == null) 'password': password,
       });
+      if (response['handoff_required'] == true) {
+        throw StateError(
+          'Đã tạo yêu cầu bàn giao. Mở “Bàn giao quyền” để chờ các máy gửi hết hàng đợi rồi hoàn tất.',
+        );
+      }
     }
     await db.transaction(() async {
       if (id == null) {

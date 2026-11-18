@@ -252,11 +252,75 @@ class LocalService {
     session = null;
   }
 
+  Future<void> acceptAuditHead(Object? value) async {
+    if (value == null) return;
+    final head = Map<String, Object?>.from(value as Map),
+        index = head['chain_index'],
+        hash = head['hash'];
+    if (index is! int ||
+        index < 0 ||
+        index > 9007199254740991 ||
+        hash is! String ||
+        (index == 0
+            ? hash.isNotEmpty
+            : !RegExp(r'^[a-f0-9]{64}$').hasMatch(hash))) {
+      throw StateError('Cloud trả mốc audit không hợp lệ.');
+    }
+    final local = await db.rows(
+      'SELECT hash FROM audit_logs WHERE store_id=? AND device_id=? AND chain_index=?',
+      [storeId, deviceId, index],
+    );
+    if (local.isNotEmpty && local.single['hash'] != hash) {
+      throw StateError(
+        'Mốc audit cloud khác máy; cần đối soát trước khi ghi tiếp.',
+      );
+    }
+    final key = 'audit_head:$storeId:$deviceId',
+        old = await db.rows('SELECT value FROM local_settings WHERE key=?', [
+          key,
+        ]);
+    if (old.isNotEmpty) {
+      final prior = jsonDecode(old.single['value'] as String) as Map;
+      if ((prior['chain_index'] as int) > index) return;
+      if (prior['chain_index'] == index && prior['hash'] != hash) {
+        throw StateError('Mốc audit thay đổi nội dung.');
+      }
+    }
+    await db.execute(
+      'INSERT INTO local_settings VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value',
+      [key, jsonEncode(head)],
+    );
+  }
+
   Future<LocalSession> login(String username, String password) async {
     Map<String, Object?>? remote;
     try {
       remote = await onlineLogin?.call(username.trim(), password);
     } on CloudError catch (error) {
+      if (error.code == 'STAFF_HANDOFF_PENDING') {
+        final frozen = await db.rows(
+          'SELECT u.id FROM users u JOIN employee_store_assignments a ON a.user_id=u.id WHERE u.username=? AND a.store_id=?',
+          [username.trim(), storeId],
+        );
+        await db.transaction(() async {
+          for (final user in frozen) {
+            await db.execute('DELETE FROM local_settings WHERE key=?', [
+              'grant:${user['id']}',
+            ]);
+          }
+        });
+        final current = session;
+        if (current != null && frozen.any((u) => u['id'] == current.userId)) {
+          session = LocalSession(
+            userId: current.userId,
+            name: current.name,
+            role: current.role,
+            storeId: current.storeId,
+            deviceId: current.deviceId,
+            expiresAt: clock(),
+          );
+        }
+      }
       if (error.code == 'DEVICE_IDENTITY') {
         restoreBlocked = true;
         await db.execute(
@@ -295,6 +359,7 @@ class LocalService {
       final salt = Passwords.salt(),
           hash = await Passwords.hash(password, salt);
       await db.transaction(() async {
+        await acceptAuditHead(remote!['audit_head']);
         // Đăng nhập API thành công xác nhận máy pending đã được chủ duyệt.
         await db.execute(
           "UPDATE devices SET status='approved' WHERE store_id=? AND id=? AND status='pending'",
@@ -399,6 +464,7 @@ class LocalService {
     final role = Role.values.byName(user['role'] as String),
         expires = DateTime.parse(remote['expires_at'] as String);
     await db.transaction(() async {
+      await acceptAuditHead(remote['audit_head']);
       await db.execute(
         'UPDATE users SET display_name=?,active=1,must_change_password=?,updated_at=? WHERE id=?',
         [
@@ -658,10 +724,25 @@ class LocalService {
       'SELECT hash,chain_index FROM audit_logs WHERE store_id=? AND device_id=? AND chain_index>0 ORDER BY chain_index DESC LIMIT 1',
       [storeId, deviceId],
     );
-    final prev = previous.isEmpty ? '' : previous.first['hash'] as String;
-    final index = previous.isEmpty
-        ? 1
-        : (previous.first['chain_index'] as int) + 1;
+    var prev = previous.isEmpty ? '' : previous.first['hash'] as String;
+    var previousIndex = previous.isEmpty
+        ? 0
+        : previous.first['chain_index'] as int;
+    final heads = await db.rows(
+      'SELECT value FROM local_settings WHERE key=?',
+      ['audit_head:$storeId:$deviceId'],
+    );
+    if (heads.isNotEmpty) {
+      final head = jsonDecode(heads.single['value'] as String) as Map;
+      final remoteIndex = head['chain_index'] as int;
+      if (remoteIndex > previousIndex) {
+        previousIndex = remoteIndex;
+        prev = head['hash'] as String;
+      } else if (remoteIndex == previousIndex && head['hash'] != prev) {
+        throw StateError('Chuỗi audit không khớp checkpoint.');
+      }
+    }
+    final index = previousIndex + 1;
     final current = actor ?? session;
     if (documentCode == null && type == 'document') {
       final documents = await db.rows(
@@ -743,6 +824,7 @@ class LocalService {
               'commercial_rules',
               'tailoring_rules',
               'size_rules',
+              'bank_accounts',
             ].contains(table)) {
           row['lww_key'] = '${row['updated_at']}|$deviceId|$id';
           await db.execute('UPDATE $table SET lww_key=? WHERE id=?', [
@@ -761,6 +843,17 @@ class LocalService {
     } else if (type == 'catalog') {
       await collect('products', 'id=?', [payload['product_id']]);
       await collect('product_variants', 'id=?', [payload['variant_id']]);
+      if (payload['threshold_id'] != null) {
+        await collect('stock_threshold_rules', 'store_id=? AND id=?', [
+          storeId,
+          payload['threshold_id'],
+        ]);
+      }
+    } else if (type == 'bank_account') {
+      await collect('bank_accounts', 'store_id=? AND id=?', [
+        storeId,
+        payload['id'],
+      ]);
     } else if (type == 'stock_movement') {
       await collect('stock_movements', 'id=?', [payload['id']]);
     } else if (type == 'audit') {

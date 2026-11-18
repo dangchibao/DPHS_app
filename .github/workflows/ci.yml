@@ -16,6 +16,10 @@ jobs:
         working-directory: api
       - run: npm run lint && npm run typecheck && npm test && npm run build
         working-directory: api
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m unittest discover -s scripts -p "test_cloud_*.py" -v
   flutter:
     runs-on: windows-latest
     steps:
@@ -30,6 +34,7 @@ jobs:
         working-directory: app
       - run: flutter test
         working-directory: app
+      - run: python scripts/crash_recovery_test.py
       - run: flutter build windows --release
         working-directory: app
       - run: flutter build web --release

@@ -30,6 +30,7 @@ it("KDF ở client; API giữ hash lớp ngoài, từ chối replay hash DB và 
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          "X-Client-Schema": "30",
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
         body: JSON.stringify(body),

@@ -1,12 +1,24 @@
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
+import 'package:uuid/uuid.dart';
+
+import '../../core/sync/cloud_api.dart';
 
 import '../../core/local_service.dart';
 import '../../core/auth/permissions.dart';
 
 class ManagementPage extends StatefulWidget {
-  const ManagementPage({super.key, required this.service});
-  final LocalService service;
+  const ManagementPage({super.key, required this.service})
+    : api = null,
+      deviceId = null;
+  const ManagementPage.online({
+    super.key,
+    required this.api,
+    required this.deviceId,
+  }) : service = null;
+  final LocalService? service;
+  final CloudApi? api;
+  final String? deviceId;
   @override
   State<ManagementPage> createState() => _ManagementPageState();
 }
@@ -25,8 +37,8 @@ class _ManagementPageState extends State<ManagementPage> {
   }
 
   Future<Map<String, Object?>> request([Map<String, Object?>? body]) async {
-    widget.service.require(Permission.configure);
-    final api = widget.service.syncEngine?.api;
+    widget.service?.require(Permission.configure);
+    final api = widget.api ?? widget.service?.syncEngine?.api;
     if (api == null) {
       throw StateError(
         'Cần kết nối API và đăng nhập online để quản trị hệ thống.',
@@ -88,7 +100,9 @@ class _ManagementPageState extends State<ManagementPage> {
                     ),
                     const SizedBox(height: 16),
                     SelectableText(token),
-                    Text('API: ${widget.service.syncEngine!.api.baseUrl}'),
+                    Text(
+                      'API: ${(widget.api ?? widget.service?.syncEngine?.api)?.baseUrl}',
+                    ),
                   ],
                 ),
               ),
@@ -123,13 +137,13 @@ class _ManagementPageState extends State<ManagementPage> {
     if (values == null || !mounted) return;
     await mutate({
       'action': 'create_store',
-      'id': widget.service.uuid.v7(),
-      'assignment_id': widget.service.uuid.v7(),
+      'id': const Uuid().v7(),
+      'assignment_id': const Uuid().v7(),
       ...values,
     });
   }
 
-  Future<void> invite() async {
+  Future<void> invite({bool web = false}) async {
     final values = await form('Đăng ký máy tại chi nhánh', [
       ('code', 'Mã máy (B3, không tái dùng)'),
       ('name', 'Tên máy'),
@@ -138,8 +152,9 @@ class _ManagementPageState extends State<ManagementPage> {
     if (values == null || !mounted) return;
     await mutate({
       'action': 'invite_device',
-      'id': widget.service.uuid.v7(),
-      'enrollment_id': widget.service.uuid.v7(),
+      'kind': web ? 'web' : 'native',
+      'id': const Uuid().v7(),
+      'enrollment_id': const Uuid().v7(),
       'store_id': selected,
       ...values,
     });
@@ -170,7 +185,7 @@ class _ManagementPageState extends State<ManagementPage> {
     if (choice == null || !mounted) return;
     await mutate({
       'action': 'assign_staff',
-      'id': widget.service.uuid.v7(),
+      'id': const Uuid().v7(),
       'store_id': selected,
       ...choice,
     });
@@ -232,9 +247,14 @@ class _ManagementPageState extends State<ManagementPage> {
           runSpacing: 8,
           children: [
             FilledButton.icon(
-              onPressed: busy ? null : invite,
+              onPressed: busy ? null : () => invite(),
               icon: const Icon(Icons.add),
               label: const Text('Mời máy mới'),
+            ),
+            OutlinedButton.icon(
+              onPressed: busy ? null : () => invite(web: true),
+              icon: const Icon(Icons.language),
+              label: const Text('Mời trình duyệt online'),
             ),
             OutlinedButton(
               onPressed: busy ? null : assign,
@@ -263,7 +283,7 @@ class _ManagementPageState extends State<ManagementPage> {
                       ? 'Đã đăng ký · chờ duyệt'
                       : 'Chờ máy nhận mã đăng ký',
                 ),
-                if (d['id'] != widget.service.deviceId &&
+                if (d['id'] != (widget.deviceId ?? widget.service?.deviceId) &&
                     d['status'] != 'revoked')
                   Wrap(
                     spacing: 12,

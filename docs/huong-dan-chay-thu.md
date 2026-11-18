@@ -2,6 +2,8 @@
 
 ## Windows
 
+Có thể dùng bộ cài ngoc-thanh-windows-0.7.0-setup-preview.exe: cài cho tài khoản Windows hiện tại, sau đó mở từ menu Start → Đồng phục Ngọc Thanh — Chạy thử. Đóng ứng dụng và sao lưu trước khi nâng cấp. Bộ cài/gỡ giữ nguyên SQLite và backup; chưa ký Authenticode. Bản ZIP portable vẫn dùng được. Xem docs/operations/windows-installer.md.
+
 Mở PowerShell tại `D:\app\DPHS_app`, chạy:
 
 ```powershell
@@ -34,7 +36,7 @@ Khi chạy EXE trực tiếp lần đầu và chưa có cấu hình môi trườ
 
 ## Kiểm thử mất mạng và khôi phục
 
-Source/bản thử 0.5.0 bổ sung: **Bảng size** để cấu hình khoảng chiều cao/cân nặng và gợi ý; **Chuyển kho cửa hàng** để xuất CK, xác nhận giao và kiểm đếm tại máy nhận chỉ định; **Chấm công nhân viên** cho chủ/quản lý/kế toán. Chấm công yêu cầu lý do, sửa bằng bản ghi mới và hiển thị trạng thái chờ server. Chưa có chức năng phát hành bảng lương.
+Source/bản thử 0.5.0 bổ sung: **Bảng size** để cấu hình khoảng chiều cao/cân nặng và gợi ý; **Chuyển kho cửa hàng** để xuất CK, xác nhận giao và kiểm đếm tại máy nhận chỉ định; **Chấm công nhân viên** cho chủ/quản lý/kế toán. Chấm công yêu cầu lý do, sửa bằng bản ghi mới và hiển thị trạng thái chờ server. Bản 0.7 có cấu hình, phát hành, hủy và in bảng lương trên Windows/Android; phải đồng bộ/đối soát trước khi chốt.
 
 Đăng nhập online trước để có quyền offline còn hạn; tắt API local rồi thử bán. Hàng đợi phải tăng, giỏ và tồn cập nhật ngay. Mở lại API, bấm đồng bộ và kiểm tra hàng đợi hết; gửi lại không nhân đôi hóa đơn.
 
@@ -42,7 +44,7 @@ Chỉ diễn tập restore trên dữ liệu thử. Restore có xác nhận hai 
 
 ## Giới hạn bản này
 
-Chưa nghiệm thu toàn bộ phần mềm. QR chuyển khoản còn là vùng chờ cấu hình, không xác minh giao dịch ngân hàng. Đã có giữ hàng có hạn và đăng ký/duyệt máy, tạo chi nhánh ở bản 0.4.0/schema 18. Chuyển kho, bàn giao nhân viên/quyền tồn, payroll/dashboard và Web quản lý còn chưa hoàn chỉnh. Khởi tạo dữ liệu mẫu chỉ dành thử local; thiết bị thực tế phải đăng ký danh tính riêng với API đã provision. Xem `docs/phases/progress.md`.
+Bản chạy thử 0.7/schema 30 đã có chuyển kho, bàn giao quyền nhiều máy, lương, báo cáo, Web quản lý online và cấu hình QR chuyển khoản; QR không xác minh giao dịch ngân hàng. Chưa nghiệm thu cloud production hoặc máy in/máy quét/điện thoại thực. Web không bán offline. Khởi tạo dữ liệu mẫu chỉ dành thử local; thiết bị thực tế phải đăng ký danh tính riêng với API đã provision. Xem docs/phases/progress.md và docs/operations/release-and-cloud-setup.md.
 
 ## Giữ hàng và thiết bị mới (0.4.0)
 
@@ -51,3 +53,11 @@ Menu **Giữ hàng · đặt trước**: tạo DH với tên/điện thoại, th
 Chủ đăng nhập online → **Cửa hàng · thiết bị** để thêm chi nhánh, mời máy và gán nhân viên đã có vào chi nhánh mới. Trên bản cài trống chọn **Kết nối chi nhánh · đăng ký máy mới**, nhập API HTTPS và mã đăng ký trong 1 giờ. Chủ tải lại danh sách rồi duyệt; nhân viên đăng nhập online lần đầu. Không sao chép database để tạo máy bán thứ hai. Thu hồi máy không thể thông báo tức thì khi máy đang mất mạng; đồng bộ hết giao dịch trước khi thu hồi.
 
 APK thử nghiệm hiện sử dụng khóa ký debug của công cụ build. Bản phát hành cuối cần khóa ký do chủ ứng dụng quản lý. Chưa có cloud production hoặc dịch vụ trả phí được kích hoạt.
+
+## Bổ sung bản 0.7/schema 30
+
+- Lương: cấu hình nhân viên, chấm công và quy tắc hoa hồng/thưởng; đồng bộ rồi phát hành theo kỳ, xem/in phiếu lương. Chỉ vai trò có quyền được truy cập.
+- Báo cáo: chọn khoảng ngày, cửa hàng, năm học/trường; xem doanh thu, size/sản phẩm, tồn, công nợ và xuất Excel/PDF. Chủ xem tổng hợp toàn hệ thống.
+- Bàn giao nhân viên: cần online; chờ các máy liên quan gửi hết hàng đợi và xác nhận trước khi đổi quyền. Máy mất mạng chưa xác nhận sẽ chặn hoàn tất.
+- Nhật ký cloud: lọc theo cửa hàng/ngày; phần kho lưu trữ audit chỉ dùng khi đã cấu hình bucket riêng. Chủ chuẩn bị, tải lên/kiểm chứng rồi xác nhận lưu trữ; không xóa sổ cái kho/chứng từ.
+- Web/PWA: quản lý và báo cáo khi có mạng; gói ZIP cần được triển khai cùng API trước khi dùng trên iPhone/iPad. Hiện chưa có địa chỉ public.
