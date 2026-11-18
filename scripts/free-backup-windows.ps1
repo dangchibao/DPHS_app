@@ -8,9 +8,17 @@ $taskName = 'NgocThanhPOS-Free-D1-Backup-Staging'
 $deploymentRoot = Join-Path $env:LOCALAPPDATA 'NgocThanhPOSDeployment'
 $reportPath = Join-Path $deploymentRoot 'free-d1-backup-status.json'
 if ($Mode -eq 'Status') {
-  Get-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue | Select-Object TaskName,State
-  Get-ScheduledTaskInfo -TaskName $taskName -ErrorAction SilentlyContinue | Select-Object LastRunTime,NextRunTime,LastTaskResult
-  if (Test-Path -LiteralPath $reportPath) { Get-Content -LiteralPath $reportPath }
+  $task = Get-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue
+  $info = if ($task) { Get-ScheduledTaskInfo -TaskName $taskName }
+  $report = if (Test-Path -LiteralPath $reportPath) { Get-Content -LiteralPath $reportPath -Raw | ConvertFrom-Json }
+  [pscustomobject]@{
+    TaskName = $taskName
+    TaskState = if ($task) { [string]$task.State } else { 'NotInstalled' }
+    LastRunTime = $info.LastRunTime
+    NextRunTime = $info.NextRunTime
+    LastTaskResult = $info.LastTaskResult
+    Backup = $report
+  } | ConvertTo-Json -Depth 4
   return
 }
 if (!$PythonExecutable -or !(Test-Path -LiteralPath $PythonExecutable -PathType Leaf)) {
